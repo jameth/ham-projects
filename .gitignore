@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.Trash-*
+
+# Editor / IDE
+.vscode/
+.idea/
+*.iml
+.project
+.settings/
+
+# Claude / agent state
+.claude/
+
+# Elecraft manuals (copyrighted; download from elecraft.com directly)
+KH1/Elecraft KH1 Programmer's Ref*.pdf
+KH1/KH1 Owner's Manual*.pdf
+
+# Yaesu FTX-1 manuals, firmware, and proprietary driver (copyrighted)
+# Only the user's own research notes are committed from FTX1/
+FTX1/*
+!FTX1/FTX-1_Optima_Research_Guide.md
