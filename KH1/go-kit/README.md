@@ -235,6 +235,89 @@ fit any 5-way binding post.
 
 Well under the 250 g target. Trips that don't need the EFHW save ~93 g.
 
+## Optional Variants (Pending Field Testing)
+
+### 20 m-Optimized 4-Radial Variant
+
+For operators whose 20 m time dominates (>70% of operating). Trades
+some 17 m efficiency for a substantial 20 m boost via 4× same-length
+resonant radials.
+
+**Kit changes vs the standard 3-wire kit:**
+
+| Component | Standard kit | 20 m-optimized variant |
+|---|---|---|
+| Wire A | 13' (17 m λ/4) | 16.5' (20 m λ/4) |
+| Wire B | 16.5' | 16.5' |
+| Wire C | 13' | 16.5' |
+| Wire D (new) | not present | 16.5' (additional 4th radial) |
+| Wire E (extension) | not present | 2' wire with banana hardware (enables 35' chain in Option 3 to dodge 20 m λ/2 dead zone) |
+
+All four short wires become identical 16.5' lengths. The 2' extension
+wire is optional but restores Option 3 multi-band capability on 20 m
+(without it, the chained 33' radiator sits on 20 m λ/2 and the ATU
+can't match).
+
+**New capability (Option 1c — quad-radial whip):**
+
+Stack all four 16.5' spade lugs under the ground thumbnut. Fan the
+radials at 90° intervals on the ground. The whip + 4× resonant
+radials approaches true ground-plane behavior on 20 m.
+
+Theoretical gain on 20 m: **+3 dB over single radial**, or
+**+6 dB over no radial** (factory whip alone). Roughly 1.5 S-units
+of audible improvement.
+
+**Trade-offs vs standard kit:**
+
+| Band | Standard kit (mixed lengths) | 20 m-optimized (all 16.5') |
+|---|---|---|
+| 20 m | up to +5 dB | **up to +8 dB** (Option 1c quad-radial) |
+| 17 m | up to +5 dB (resonant CP) | +3 dB (no resonant wire) |
+| 15 m | +3 dB | +2.5 dB |
+| 30 m | +1 dB | +1.5 dB |
+| 40 m | unchanged (needs Option 3 or 4) | unchanged |
+
+Net: ~+3 dB on 20 m (best case, Option 1c), ~-2 dB on 17 m, marginal
+elsewhere. Good trade if 20 m is dominant; bad trade if you split
+time across bands.
+
+### Test Plan Before Committing
+
+Validate the +3 dB theoretical gain with on-air measurement before
+restructuring the kit.
+
+**Test procedure:**
+
+1. Same QTH (open field or activation site), same operating session
+2. Same hour, same band (20 m)
+3. KH1 set to identical power, sidetone, filter settings
+4. Send a CQ identifier on a clear frequency 5-10 times with each
+   configuration; let RBN spot you
+5. Compare RBN-skimmer-reported SNR averages across configurations
+
+**Configurations to test:**
+
+| # | Configuration | Hypothesis |
+|---|---|---|
+| 1 | Whip + 1× 16.5' radial | baseline (current Option 1a) |
+| 2 | Whip + 2× 16.5' radials | should show +1.5 dB over #1 |
+| 3 | Whip + 4× 16.5' radials | should show +3 dB over #1 (the variant's payoff) |
+| 4 | Whip alone, no radial | reference floor |
+| 5 | Option 2 (1× 16.5' rad + 1× 13' CP on BNC) | reference for wire-vs-whip comparison |
+
+**Decision criteria:**
+
+- If #3 shows ≥ +2 dB over #1: commit to the variant
+- If #3 shows < +2 dB over #1 (ground losses, body capacitance dominating, or measurement noise): stay with standard 3-wire kit
+- Document results in `../measurements/` (TBD subfolder)
+
+The body capacitance question is the most likely complication: when
+hand-held pedestrian-mobile, the operator's body provides much of the
+ground reference, so the marginal benefit of additional radials may
+shrink. Stationary table-top tests should show closer to theoretical
+gain.
+
 ## Deployment Recipes
 
 See `deployment-guide.md` for step-by-step field setup of each option.
