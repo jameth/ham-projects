@@ -182,6 +182,32 @@ class FilterWidthUpdate:
     index: int
 
 
+class ScopeSpeed(Enum):
+    SLOW1 = "0"
+    SLOW2 = "1"
+    FAST1 = "2"
+    FAST2 = "3"
+    FAST3 = "4"
+    STOP = "5"
+
+
+class ScopePeak(Enum):
+    LV1 = "0"
+    LV2 = "1"
+    LV3 = "2"
+    LV4 = "3"
+    LV5 = "4"
+
+
+class AfFftMode(Enum):
+    AF_FFT_0DB = "0"
+    AF_FFT_10DB = "1"
+    AF_FFT_20DB = "2"
+    OSC_0DB = "3"
+    OSC_10DB = "4"
+    OSC_20DB = "5"
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
@@ -428,6 +454,34 @@ def encode_set_filter_width(index: int) -> bytes:
 
 def encode_read_filter_width() -> bytes:
     return b"SH0;"
+
+
+def encode_set_scope_speed(speed: ScopeSpeed) -> bytes:
+    return f"SS00{speed.value}0000;".encode("ascii")
+
+
+def encode_set_scope_peak(peak: ScopePeak) -> bytes:
+    return f"SS01{peak.value}0000;".encode("ascii")
+
+
+def encode_set_scope_marker(enabled: bool) -> bytes:
+    return b"SS0210000;" if enabled else b"SS0200000;"
+
+
+def encode_set_scope_color(color: int) -> bytes:
+    if not (1 <= color <= 11):
+        raise ValueError(f"scope color {color} out of range 1..11")
+    digit = "0123456789A"[color - 1]
+    return f"SS03{digit}0000;".encode("ascii")
+
+
+def encode_set_af_fft_mode(mode: AfFftMode) -> bytes:
+    # P3 = mode.value, P4 = 0 (fixed), P5 = 0 (OSC time, default 1ms), P6,P7 = 0.
+    return f"SS07{mode.value}00000;".encode("ascii")
+
+
+def encode_read_af_fft() -> bytes:
+    return b"SS07;"
 
 
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":

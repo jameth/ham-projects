@@ -404,3 +404,68 @@ def test_encode_set_filter_width_rejects_out_of_range():
 
 def test_encode_read_filter_width():
     assert protocol.encode_read_filter_width() == b"SH0;"
+
+
+SCOPE_SPEED_CASES = [
+    ("SLOW1", "0"), ("SLOW2", "1"), ("FAST1", "2"),
+    ("FAST2", "3"), ("FAST3", "4"), ("STOP", "5"),
+]
+
+
+@pytest.mark.parametrize("name,digit", SCOPE_SPEED_CASES)
+def test_encode_set_scope_speed(name, digit):
+    speed = protocol.ScopeSpeed[name]
+    assert protocol.encode_set_scope_speed(speed) == f"SS00{digit}0000;".encode("ascii")
+
+
+SCOPE_PEAK_CASES = [
+    ("LV1", "0"), ("LV2", "1"), ("LV3", "2"), ("LV4", "3"), ("LV5", "4"),
+]
+
+
+@pytest.mark.parametrize("name,digit", SCOPE_PEAK_CASES)
+def test_encode_set_scope_peak(name, digit):
+    peak = protocol.ScopePeak[name]
+    assert protocol.encode_set_scope_peak(peak) == f"SS01{digit}0000;".encode("ascii")
+
+
+def test_encode_set_scope_marker():
+    assert protocol.encode_set_scope_marker(True) == b"SS0210000;"
+    assert protocol.encode_set_scope_marker(False) == b"SS0200000;"
+
+
+SCOPE_COLOR_CASES = [
+    (1, "0"), (2, "1"), (10, "9"), (11, "A"),
+]
+
+
+@pytest.mark.parametrize("color,digit", SCOPE_COLOR_CASES)
+def test_encode_set_scope_color(color, digit):
+    assert protocol.encode_set_scope_color(color) == f"SS03{digit}0000;".encode("ascii")
+
+
+def test_encode_set_scope_color_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        protocol.encode_set_scope_color(12)
+
+
+# SS07 byte layout per CAT manual p.21:
+#   SS 0 7 P3 P4 P5 P6 P7 ;
+#   P3 = AF-FFT/OSC level mode (0..5)
+#   P4 = fixed 0
+#   P5 = OSC Time (0=1ms .. 5=300ms); when reading AF-FFT, leave 0
+#   P6, P7 = fixed 0
+AF_FFT_CASES = [
+    ("AF_FFT_0DB", 0), ("AF_FFT_10DB", 1), ("AF_FFT_20DB", 2),
+    ("OSC_0DB", 3), ("OSC_10DB", 4), ("OSC_20DB", 5),
+]
+
+
+@pytest.mark.parametrize("name,digit", AF_FFT_CASES)
+def test_encode_set_af_fft_mode(name, digit):
+    mode = protocol.AfFftMode[name]
+    assert protocol.encode_set_af_fft_mode(mode) == f"SS07{digit}00000;".encode("ascii")
+
+
+def test_encode_read_af_fft():
+    assert protocol.encode_read_af_fft() == b"SS07;"
