@@ -227,3 +227,49 @@ def test_decode_agc(name, digit):
 
 def test_encode_read_agc():
     assert protocol.encode_read_agc() == b"GT0;"
+
+
+def test_encode_set_nb_on():
+    assert protocol.encode_set_nb(True) == b"NB01;"
+
+
+def test_encode_set_nb_off():
+    assert protocol.encode_set_nb(False) == b"NB00;"
+
+
+def test_encode_read_nb():
+    assert protocol.encode_read_nb() == b"NB0;"
+
+
+def test_encode_set_nb_level():
+    assert protocol.encode_set_nb_level(0) == b"NL0000;"
+    assert protocol.encode_set_nb_level(10) == b"NL0010;"
+
+
+def test_encode_set_nb_level_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        protocol.encode_set_nb_level(11)
+
+
+def test_encode_set_nr_on():
+    assert protocol.encode_set_nr(True) == b"NR01;"
+
+
+def test_encode_set_nr_level():
+    assert protocol.encode_set_nr_level(1) == b"RL001;"
+    assert protocol.encode_set_nr_level(15) == b"RL015;"
+
+
+def test_encode_set_nr_level_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        protocol.encode_set_nr_level(0)
+    with pytest.raises(ValueError):
+        protocol.encode_set_nr_level(16)
+
+
+def test_encode_read_nr_level():
+    assert protocol.encode_read_nr_level() == b"RL0;"
+
+
+def test_decode_nr_level():
+    assert protocol.decode(b"RL015;") == protocol.NrLevelUpdate(level=15)

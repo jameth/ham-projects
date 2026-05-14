@@ -117,6 +117,26 @@ class AgcUpdate:
     report: AgcReport
 
 
+@dataclass(frozen=True)
+class NbUpdate:
+    enabled: bool
+
+
+@dataclass(frozen=True)
+class NbLevelUpdate:
+    level: int
+
+
+@dataclass(frozen=True)
+class NrUpdate:
+    enabled: bool
+
+
+@dataclass(frozen=True)
+class NrLevelUpdate:
+    level: int
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
@@ -126,6 +146,10 @@ RadioUpdate = Union[
     "PreampUpdate",
     "AttenuatorUpdate",
     "AgcUpdate",
+    "NbUpdate",
+    "NbLevelUpdate",
+    "NrUpdate",
+    "NrLevelUpdate",
     "UnknownFrame",
 ]
 
@@ -226,6 +250,42 @@ def encode_read_agc() -> bytes:
     return b"GT0;"
 
 
+def encode_set_nb(enabled: bool) -> bytes:
+    return b"NB01;" if enabled else b"NB00;"
+
+
+def encode_read_nb() -> bytes:
+    return b"NB0;"
+
+
+def encode_set_nb_level(level: int) -> bytes:
+    if not (0 <= level <= 10):
+        raise ValueError(f"NB level {level} out of range 0..10")
+    return f"NL00{level:02d};".encode("ascii")
+
+
+def encode_read_nb_level() -> bytes:
+    return b"NL0;"
+
+
+def encode_set_nr(enabled: bool) -> bytes:
+    return b"NR01;" if enabled else b"NR00;"
+
+
+def encode_read_nr() -> bytes:
+    return b"NR0;"
+
+
+def encode_set_nr_level(level: int) -> bytes:
+    if not (1 <= level <= 15):
+        raise ValueError(f"NR level {level} out of range 1..15")
+    return f"RL0{level:02d};".encode("ascii")
+
+
+def encode_read_nr_level() -> bytes:
+    return b"RL0;"
+
+
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
     if len(frame) != 12 or frame[-1:] != b";":
         return None
@@ -296,4 +356,16 @@ def decode(frame: bytes) -> RadioUpdate:
             return AgcUpdate(report=AgcReport(digit))
         except ValueError:
             pass
+    if len(frame) == 5 and frame[:3] == b"NB0" and frame[-1:] == b";" and frame[3:4] in (b"0", b"1"):
+        return NbUpdate(enabled=(frame[3:4] == b"1"))
+    if len(frame) == 7 and frame[:3] == b"NL0" and frame[-1:] == b";" and frame[3:4] == b"0" and frame[4:6].isdigit():
+        level = int(frame[4:6])
+        if 0 <= level <= 10:
+            return NbLevelUpdate(level=level)
+    if len(frame) == 5 and frame[:3] == b"NR0" and frame[-1:] == b";" and frame[3:4] in (b"0", b"1"):
+        return NrUpdate(enabled=(frame[3:4] == b"1"))
+    if len(frame) == 6 and frame[:3] == b"RL0" and frame[-1:] == b";" and frame[3:5].isdigit():
+        level = int(frame[3:5])
+        if 1 <= level <= 15:
+            return NrLevelUpdate(level=level)
     return UnknownFrame(raw=frame)
