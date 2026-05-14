@@ -208,6 +208,11 @@ class AfFftMode(Enum):
     OSC_20DB = "5"
 
 
+@dataclass(frozen=True)
+class SmeterUpdate:
+    raw: int
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
@@ -230,6 +235,7 @@ RadioUpdate = Union[
     "ApfFreqUpdate",
     "IfShiftUpdate",
     "FilterWidthUpdate",
+    "SmeterUpdate",
     "UnknownFrame",
 ]
 
@@ -484,6 +490,10 @@ def encode_read_af_fft() -> bytes:
     return b"SS07;"
 
 
+def encode_read_smeter() -> bytes:
+    return b"SM0;"
+
+
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
     if len(frame) != 12 or frame[-1:] != b";":
         return None
@@ -595,4 +605,8 @@ def decode(frame: bytes) -> RadioUpdate:
         idx = int(frame[4:6])
         if 0 <= idx <= 23:
             return FilterWidthUpdate(index=idx)
+    if len(frame) == 7 and frame[:3] == b"SM0" and frame[-1:] == b";" and frame[3:6].isdigit():
+        raw = int(frame[3:6])
+        if 0 <= raw <= 255:
+            return SmeterUpdate(raw=raw)
     return UnknownFrame(raw=frame)

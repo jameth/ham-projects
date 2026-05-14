@@ -469,3 +469,13 @@ def test_encode_set_af_fft_mode(name, digit):
 
 def test_encode_read_af_fft():
     assert protocol.encode_read_af_fft() == b"SS07;"
+
+
+def test_encode_read_smeter():
+    assert protocol.encode_read_smeter() == b"SM0;"
+
+
+def test_decode_smeter():
+    assert protocol.decode(b"SM0123;") == protocol.SmeterUpdate(raw=123)
+    assert protocol.decode(b"SM0000;") == protocol.SmeterUpdate(raw=0)
+    assert protocol.decode(b"SM0255;") == protocol.SmeterUpdate(raw=255)
