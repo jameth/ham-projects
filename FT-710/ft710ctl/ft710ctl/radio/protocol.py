@@ -6,6 +6,7 @@ The FT-710 CAT Operation Reference Manual is the ground truth.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+from enum import Enum
 from typing import Union
 
 
@@ -24,7 +25,29 @@ class ScopeRefLevelUpdate:
     level_db: float
 
 
-RadioUpdate = Union["ScopeSpanUpdate", "ScopeRefLevelUpdate", "UnknownFrame"]
+class ScopeMode(Enum):
+    DSS_CENTER = "0"
+    DSS_CURSOR = "1"
+    DSS_FIX = "2"
+    WF_CENTER_EXPAND = "3"
+    WF_CENTER_NORMAL = "4"
+    WF_CURSOR_EXPAND = "6"
+    WF_CURSOR_NORMAL = "7"
+    WF_FIX_EXPAND = "9"
+    WF_FIX_NORMAL = "A"
+
+
+@dataclass(frozen=True)
+class ScopeModeUpdate:
+    mode: ScopeMode
+
+
+RadioUpdate = Union[
+    "ScopeSpanUpdate",
+    "ScopeRefLevelUpdate",
+    "ScopeModeUpdate",
+    "UnknownFrame",
+]
 
 
 _SPAN_KHZ_BY_DIGIT = {
@@ -61,6 +84,14 @@ def encode_read_ref_level() -> bytes:
     return b"SS04;"
 
 
+def encode_set_scope_mode(mode: ScopeMode) -> bytes:
+    return f"SS06{mode.value}0000;".encode("ascii")
+
+
+def encode_read_scope_mode() -> bytes:
+    return b"SS06;"
+
+
 def _parse_ref_level(frame: bytes) -> "ScopeRefLevelUpdate | None":
     if len(frame) != 10 or frame[:4] != b"SS04" or frame[-1:] != b";":
         return None
@@ -84,4 +115,10 @@ def decode(frame: bytes) -> RadioUpdate:
     ref = _parse_ref_level(frame)
     if ref is not None:
         return ref
+    if len(frame) == 10 and frame[:4] == b"SS06" and frame[-1:] == b";" and frame[5:9] == b"0000":
+        digit = chr(frame[4])
+        try:
+            return ScopeModeUpdate(mode=ScopeMode(digit))
+        except ValueError:
+            pass
     return UnknownFrame(raw=frame)

@@ -69,3 +69,32 @@ def test_encode_set_ref_level_rejects_non_half_step():
 
 def test_encode_read_ref_level():
     assert protocol.encode_read_ref_level() == b"SS04;"
+
+
+SCOPE_MODE_CASES = [
+    ("DSS_CENTER", b"SS0600000;"),
+    ("DSS_CURSOR", b"SS0610000;"),
+    ("DSS_FIX", b"SS0620000;"),
+    ("WF_CENTER_EXPAND", b"SS0630000;"),
+    ("WF_CENTER_NORMAL", b"SS0640000;"),
+    ("WF_CURSOR_EXPAND", b"SS0660000;"),
+    ("WF_CURSOR_NORMAL", b"SS0670000;"),
+    ("WF_FIX_EXPAND", b"SS0690000;"),
+    ("WF_FIX_NORMAL", b"SS06A0000;"),
+]
+
+
+@pytest.mark.parametrize("name,frame", SCOPE_MODE_CASES)
+def test_encode_set_scope_mode(name, frame):
+    mode = protocol.ScopeMode[name]
+    assert protocol.encode_set_scope_mode(mode) == frame
+
+
+@pytest.mark.parametrize("name,frame", SCOPE_MODE_CASES)
+def test_decode_scope_mode(name, frame):
+    mode = protocol.ScopeMode[name]
+    assert protocol.decode(frame) == protocol.ScopeModeUpdate(mode=mode)
+
+
+def test_encode_read_scope_mode():
+    assert protocol.encode_read_scope_mode() == b"SS06;"
