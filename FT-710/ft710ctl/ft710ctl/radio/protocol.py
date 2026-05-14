@@ -82,6 +82,18 @@ class PreampUpdate:
     setting: Preamp
 
 
+class Attenuator(Enum):
+    OFF = "0"
+    DB6 = "1"
+    DB12 = "2"
+    DB18 = "3"
+
+
+@dataclass(frozen=True)
+class AttenuatorUpdate:
+    setting: Attenuator
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
@@ -89,6 +101,7 @@ RadioUpdate = Union[
     "VfoFreqUpdate",
     "ModeUpdate",
     "PreampUpdate",
+    "AttenuatorUpdate",
     "UnknownFrame",
 ]
 
@@ -173,6 +186,14 @@ def encode_read_preamp() -> bytes:
     return b"PA0;"
 
 
+def encode_set_attenuator(setting: Attenuator) -> bytes:
+    return f"RA0{setting.value};".encode("ascii")
+
+
+def encode_read_attenuator() -> bytes:
+    return b"RA0;"
+
+
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
     if len(frame) != 12 or frame[-1:] != b";":
         return None
@@ -229,6 +250,12 @@ def decode(frame: bytes) -> RadioUpdate:
         digit = chr(frame[3])
         try:
             return PreampUpdate(setting=Preamp(digit))
+        except ValueError:
+            pass
+    if len(frame) == 5 and frame[:3] == b"RA0" and frame[-1:] == b";":
+        digit = chr(frame[3])
+        try:
+            return AttenuatorUpdate(setting=Attenuator(digit))
         except ValueError:
             pass
     return UnknownFrame(raw=frame)

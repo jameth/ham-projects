@@ -174,3 +174,24 @@ def test_decode_preamp(name, digit):
 
 def test_encode_read_preamp():
     assert protocol.encode_read_preamp() == b"PA0;"
+
+
+ATT_CASES = [
+    ("OFF", "0"), ("DB6", "1"), ("DB12", "2"), ("DB18", "3"),
+]
+
+
+@pytest.mark.parametrize("name,digit", ATT_CASES)
+def test_encode_set_attenuator(name, digit):
+    setting = protocol.Attenuator[name]
+    assert protocol.encode_set_attenuator(setting) == f"RA0{digit};".encode("ascii")
+
+
+@pytest.mark.parametrize("name,digit", ATT_CASES)
+def test_decode_attenuator(name, digit):
+    setting = protocol.Attenuator[name]
+    assert protocol.decode(f"RA0{digit};".encode("ascii")) == protocol.AttenuatorUpdate(setting=setting)
+
+
+def test_encode_read_attenuator():
+    assert protocol.encode_read_attenuator() == b"RA0;"
