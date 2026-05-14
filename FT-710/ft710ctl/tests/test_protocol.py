@@ -129,3 +129,27 @@ def test_encode_read_vfo_a():
 
 def test_encode_read_vfo_b():
     assert protocol.encode_read_vfo_b() == b"FB;"
+
+
+MODE_CASES = [
+    ("LSB", "1"), ("USB", "2"), ("CW_U", "3"), ("FM", "4"), ("AM", "5"),
+    ("RTTY_L", "6"), ("CW_L", "7"), ("DATA_L", "8"), ("RTTY_U", "9"),
+    ("DATA_FM", "A"), ("FM_N", "B"), ("DATA_U", "C"), ("AM_N", "D"),
+    ("PSK", "E"), ("DATA_FM_N", "F"),
+]
+
+
+@pytest.mark.parametrize("name,digit", MODE_CASES)
+def test_encode_set_mode(name, digit):
+    mode = protocol.OperatingMode[name]
+    assert protocol.encode_set_mode(mode) == f"MD0{digit};".encode("ascii")
+
+
+@pytest.mark.parametrize("name,digit", MODE_CASES)
+def test_decode_mode(name, digit):
+    mode = protocol.OperatingMode[name]
+    assert protocol.decode(f"MD0{digit};".encode("ascii")) == protocol.ModeUpdate(mode=mode)
+
+
+def test_encode_read_mode():
+    assert protocol.encode_read_mode() == b"MD0;"

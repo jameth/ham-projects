@@ -48,11 +48,35 @@ class VfoFreqUpdate:
     hz: int
 
 
+class OperatingMode(Enum):
+    LSB = "1"
+    USB = "2"
+    CW_U = "3"
+    FM = "4"
+    AM = "5"
+    RTTY_L = "6"
+    CW_L = "7"
+    DATA_L = "8"
+    RTTY_U = "9"
+    DATA_FM = "A"
+    FM_N = "B"
+    DATA_U = "C"
+    AM_N = "D"
+    PSK = "E"
+    DATA_FM_N = "F"
+
+
+@dataclass(frozen=True)
+class ModeUpdate:
+    mode: OperatingMode
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
     "ScopeModeUpdate",
     "VfoFreqUpdate",
+    "ModeUpdate",
     "UnknownFrame",
 ]
 
@@ -121,6 +145,14 @@ def encode_read_vfo_b() -> bytes:
     return b"FB;"
 
 
+def encode_set_mode(mode: OperatingMode) -> bytes:
+    return f"MD0{mode.value};".encode("ascii")
+
+
+def encode_read_mode() -> bytes:
+    return b"MD0;"
+
+
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
     if len(frame) != 12 or frame[-1:] != b";":
         return None
@@ -167,4 +199,10 @@ def decode(frame: bytes) -> RadioUpdate:
     vfo = _parse_vfo(frame)
     if vfo is not None:
         return vfo
+    if len(frame) == 5 and frame[:3] == b"MD0" and frame[-1:] == b";":
+        digit = chr(frame[3])
+        try:
+            return ModeUpdate(mode=OperatingMode(digit))
+        except ValueError:
+            pass
     return UnknownFrame(raw=frame)
