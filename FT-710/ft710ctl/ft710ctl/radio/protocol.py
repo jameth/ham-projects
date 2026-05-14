@@ -172,6 +172,16 @@ class ApfFreqUpdate:
     freq_hz: int
 
 
+@dataclass(frozen=True)
+class IfShiftUpdate:
+    shift_hz: int
+
+
+@dataclass(frozen=True)
+class FilterWidthUpdate:
+    index: int
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
@@ -192,6 +202,8 @@ RadioUpdate = Union[
     "ContourFreqUpdate",
     "ApfUpdate",
     "ApfFreqUpdate",
+    "IfShiftUpdate",
+    "FilterWidthUpdate",
     "UnknownFrame",
 ]
 
@@ -395,6 +407,29 @@ def encode_read_apf_freq() -> bytes:
     return b"CO03;"
 
 
+def encode_set_if_shift_hz(shift_hz: int) -> bytes:
+    if not (-1200 <= shift_hz <= 1200):
+        raise ValueError(f"IF shift {shift_hz} Hz out of range -1200..+1200")
+    if shift_hz % 20 != 0:
+        raise ValueError(f"IF shift {shift_hz} Hz not on 20 Hz grid")
+    sign = "+" if shift_hz >= 0 else "-"
+    return f"IS00{sign}{abs(shift_hz):04d};".encode("ascii")
+
+
+def encode_read_if_shift() -> bytes:
+    return b"IS0;"
+
+
+def encode_set_filter_width(index: int) -> bytes:
+    if not (0 <= index <= 23):
+        raise ValueError(f"filter width index {index} out of range 0..23")
+    return f"SH00{index:02d};".encode("ascii")
+
+
+def encode_read_filter_width() -> bytes:
+    return b"SH0;"
+
+
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
     if len(frame) != 12 or frame[-1:] != b";":
         return None
@@ -497,4 +532,13 @@ def decode(frame: bytes) -> RadioUpdate:
         v = int(frame[4:8])
         if 0 <= v <= 50:
             return ApfFreqUpdate(freq_hz=(v - 25) * 10)
+    if len(frame) == 10 and frame[:4] == b"IS00" and frame[-1:] == b";" and frame[4:5] in (b"+", b"-") and frame[5:9].isdigit():
+        mag = int(frame[5:9])
+        if 0 <= mag <= 1200 and mag % 20 == 0:
+            sign = 1 if frame[4:5] == b"+" else -1
+            return IfShiftUpdate(shift_hz=sign * mag)
+    if len(frame) == 7 and frame[:4] == b"SH00" and frame[-1:] == b";" and frame[4:6].isdigit():
+        idx = int(frame[4:6])
+        if 0 <= idx <= 23:
+            return FilterWidthUpdate(index=idx)
     return UnknownFrame(raw=frame)

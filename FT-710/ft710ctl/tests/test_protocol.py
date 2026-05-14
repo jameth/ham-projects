@@ -351,3 +351,56 @@ def test_encode_read_apf_state():
 
 def test_encode_read_apf_freq():
     assert protocol.encode_read_apf_freq() == b"CO03;"
+
+
+def test_encode_set_if_shift_zero():
+    assert protocol.encode_set_if_shift_hz(0) == b"IS00+0000;"
+
+
+def test_encode_set_if_shift_positive():
+    assert protocol.encode_set_if_shift_hz(1000) == b"IS00+1000;"
+
+
+def test_encode_set_if_shift_negative():
+    assert protocol.encode_set_if_shift_hz(-1000) == b"IS00-1000;"
+
+
+def test_encode_set_if_shift_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        protocol.encode_set_if_shift_hz(1220)
+    with pytest.raises(ValueError):
+        protocol.encode_set_if_shift_hz(-1220)
+
+
+def test_encode_set_if_shift_rejects_non_20hz_step():
+    with pytest.raises(ValueError):
+        protocol.encode_set_if_shift_hz(15)
+
+
+def test_encode_read_if_shift():
+    assert protocol.encode_read_if_shift() == b"IS0;"
+
+
+def test_decode_if_shift():
+    assert protocol.decode(b"IS00+1000;") == protocol.IfShiftUpdate(shift_hz=1000)
+
+
+SH_CASES = [
+    (0, b"SH0000;"), (1, b"SH0001;"), (15, b"SH0015;"), (23, b"SH0023;"),
+]
+
+
+@pytest.mark.parametrize("idx,frame", SH_CASES)
+def test_encode_set_filter_width(idx, frame):
+    assert protocol.encode_set_filter_width(idx) == frame
+
+
+def test_encode_set_filter_width_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        protocol.encode_set_filter_width(24)
+    with pytest.raises(ValueError):
+        protocol.encode_set_filter_width(-1)
+
+
+def test_encode_read_filter_width():
+    assert protocol.encode_read_filter_width() == b"SH0;"
