@@ -137,6 +137,41 @@ class NrLevelUpdate:
     level: int
 
 
+@dataclass(frozen=True)
+class ManualNotchUpdate:
+    enabled: bool
+
+
+@dataclass(frozen=True)
+class ManualNotchFreqUpdate:
+    freq_hz: int
+
+
+@dataclass(frozen=True)
+class AutoNotchUpdate:
+    enabled: bool
+
+
+@dataclass(frozen=True)
+class ContourUpdate:
+    enabled: bool
+
+
+@dataclass(frozen=True)
+class ContourFreqUpdate:
+    freq_hz: int
+
+
+@dataclass(frozen=True)
+class ApfUpdate:
+    enabled: bool
+
+
+@dataclass(frozen=True)
+class ApfFreqUpdate:
+    freq_hz: int
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
@@ -150,6 +185,13 @@ RadioUpdate = Union[
     "NbLevelUpdate",
     "NrUpdate",
     "NrLevelUpdate",
+    "ManualNotchUpdate",
+    "ManualNotchFreqUpdate",
+    "AutoNotchUpdate",
+    "ContourUpdate",
+    "ContourFreqUpdate",
+    "ApfUpdate",
+    "ApfFreqUpdate",
     "UnknownFrame",
 ]
 
@@ -286,6 +328,73 @@ def encode_read_nr_level() -> bytes:
     return b"RL0;"
 
 
+def encode_set_manual_notch(enabled: bool) -> bytes:
+    return b"BP00001;" if enabled else b"BP00000;"
+
+
+def encode_set_manual_notch_freq_hz(freq_hz: int) -> bytes:
+    if not (10 <= freq_hz <= 3200):
+        raise ValueError(f"manual notch freq {freq_hz} Hz out of range 10..3200")
+    if freq_hz % 10 != 0:
+        raise ValueError(f"manual notch freq {freq_hz} Hz not on 10 Hz grid")
+    return f"BP01{freq_hz // 10:03d};".encode("ascii")
+
+
+def encode_read_manual_notch_state() -> bytes:
+    return b"BP00;"
+
+
+def encode_read_manual_notch_freq() -> bytes:
+    return b"BP01;"
+
+
+def encode_set_auto_notch(enabled: bool) -> bytes:
+    return b"BC01;" if enabled else b"BC00;"
+
+
+def encode_read_auto_notch() -> bytes:
+    return b"BC0;"
+
+
+def encode_set_contour(enabled: bool) -> bytes:
+    return b"CO000001;" if enabled else b"CO000000;"
+
+
+def encode_set_contour_freq_hz(freq_hz: int) -> bytes:
+    if not (10 <= freq_hz <= 3200):
+        raise ValueError(f"contour freq {freq_hz} Hz out of range 10..3200")
+    return f"CO01{freq_hz:04d};".encode("ascii")
+
+
+def encode_set_apf(enabled: bool) -> bytes:
+    return b"CO020001;" if enabled else b"CO020000;"
+
+
+def encode_set_apf_freq_hz(freq_hz: int) -> bytes:
+    if not (-250 <= freq_hz <= 250):
+        raise ValueError(f"APF freq {freq_hz} Hz out of range -250..+250")
+    if freq_hz % 10 != 0:
+        raise ValueError(f"APF freq {freq_hz} Hz not on 10 Hz grid")
+    value = (freq_hz // 10) + 25
+    return f"CO03{value:04d};".encode("ascii")
+
+
+def encode_read_contour_state() -> bytes:
+    return b"CO00;"
+
+
+def encode_read_contour_freq() -> bytes:
+    return b"CO01;"
+
+
+def encode_read_apf_state() -> bytes:
+    return b"CO02;"
+
+
+def encode_read_apf_freq() -> bytes:
+    return b"CO03;"
+
+
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
     if len(frame) != 12 or frame[-1:] != b";":
         return None
@@ -368,4 +477,24 @@ def decode(frame: bytes) -> RadioUpdate:
         level = int(frame[3:5])
         if 1 <= level <= 15:
             return NrLevelUpdate(level=level)
+    if len(frame) == 8 and frame[:4] == b"BP00" and frame[-1:] == b";" and frame[4:7] in (b"000", b"001"):
+        return ManualNotchUpdate(enabled=(frame[4:7] == b"001"))
+    if len(frame) == 8 and frame[:4] == b"BP01" and frame[-1:] == b";" and frame[4:7].isdigit():
+        units = int(frame[4:7])
+        if 1 <= units <= 320:
+            return ManualNotchFreqUpdate(freq_hz=units * 10)
+    if len(frame) == 5 and frame[:3] == b"BC0" and frame[-1:] == b";" and frame[3:4] in (b"0", b"1"):
+        return AutoNotchUpdate(enabled=(frame[3:4] == b"1"))
+    if len(frame) == 9 and frame[:4] == b"CO00" and frame[-1:] == b";" and frame[4:8] in (b"0000", b"0001"):
+        return ContourUpdate(enabled=(frame[4:8] == b"0001"))
+    if len(frame) == 9 and frame[:4] == b"CO01" and frame[-1:] == b";" and frame[4:8].isdigit():
+        hz = int(frame[4:8])
+        if 10 <= hz <= 3200:
+            return ContourFreqUpdate(freq_hz=hz)
+    if len(frame) == 9 and frame[:4] == b"CO02" and frame[-1:] == b";" and frame[4:8] in (b"0000", b"0001"):
+        return ApfUpdate(enabled=(frame[4:8] == b"0001"))
+    if len(frame) == 9 and frame[:4] == b"CO03" and frame[-1:] == b";" and frame[4:8].isdigit():
+        v = int(frame[4:8])
+        if 0 <= v <= 50:
+            return ApfFreqUpdate(freq_hz=(v - 25) * 10)
     return UnknownFrame(raw=frame)

@@ -273,3 +273,81 @@ def test_encode_read_nr_level():
 
 def test_decode_nr_level():
     assert protocol.decode(b"RL015;") == protocol.NrLevelUpdate(level=15)
+
+
+def test_encode_set_manual_notch_on():
+    assert protocol.encode_set_manual_notch(True) == b"BP00001;"
+
+
+def test_encode_set_manual_notch_off():
+    assert protocol.encode_set_manual_notch(False) == b"BP00000;"
+
+
+def test_encode_set_manual_notch_freq():
+    assert protocol.encode_set_manual_notch_freq_hz(1500) == b"BP01150;"
+    assert protocol.encode_set_manual_notch_freq_hz(10) == b"BP01001;"
+
+
+def test_encode_read_manual_notch_state():
+    assert protocol.encode_read_manual_notch_state() == b"BP00;"
+
+
+def test_encode_read_manual_notch_freq():
+    assert protocol.encode_read_manual_notch_freq() == b"BP01;"
+
+
+def test_decode_manual_notch_freq():
+    assert protocol.decode(b"BP01150;") == protocol.ManualNotchFreqUpdate(freq_hz=1500)
+
+
+def test_encode_set_auto_notch_on():
+    assert protocol.encode_set_auto_notch(True) == b"BC01;"
+
+
+def test_encode_read_auto_notch():
+    assert protocol.encode_read_auto_notch() == b"BC0;"
+
+
+def test_encode_set_contour_on():
+    assert protocol.encode_set_contour(True) == b"CO000001;"
+
+
+def test_encode_set_contour_off():
+    assert protocol.encode_set_contour(False) == b"CO000000;"
+
+
+def test_encode_set_contour_freq():
+    assert protocol.encode_set_contour_freq_hz(1500) == b"CO011500;"
+
+
+def test_encode_set_contour_freq_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        protocol.encode_set_contour_freq_hz(5)
+    with pytest.raises(ValueError):
+        protocol.encode_set_contour_freq_hz(3201)
+
+
+def test_encode_set_apf_on():
+    assert protocol.encode_set_apf(True) == b"CO020001;"
+
+
+def test_encode_set_apf_freq():
+    assert protocol.encode_set_apf_freq_hz(-250) == b"CO030000;"
+    assert protocol.encode_set_apf_freq_hz(0) == b"CO030025;"
+    assert protocol.encode_set_apf_freq_hz(250) == b"CO030050;"
+
+
+def test_encode_read_contour_state():
+    assert protocol.encode_read_contour_state() == b"CO00;"
+
+
+def test_encode_read_contour_freq():
+    assert protocol.encode_read_contour_freq() == b"CO01;"
+
+
+def test_encode_read_apf_state():
+    assert protocol.encode_read_apf_state() == b"CO02;"
+
+
+def test_encode_read_apf_freq():
+    assert protocol.encode_read_apf_freq() == b"CO03;"
