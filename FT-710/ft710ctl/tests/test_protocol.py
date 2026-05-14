@@ -98,3 +98,34 @@ def test_decode_scope_mode(name, frame):
 
 def test_encode_read_scope_mode():
     assert protocol.encode_read_scope_mode() == b"SS06;"
+
+
+def test_encode_set_vfo_a_hz():
+    assert protocol.encode_set_vfo_a_hz(14_250_000) == b"FA014250000;"
+
+
+def test_encode_set_vfo_b_hz():
+    assert protocol.encode_set_vfo_b_hz(7_074_000) == b"FB007074000;"
+
+
+def test_decode_vfo_a():
+    assert protocol.decode(b"FA014250000;") == protocol.VfoFreqUpdate(vfo="A", hz=14_250_000)
+
+
+def test_decode_vfo_b():
+    assert protocol.decode(b"FB007074000;") == protocol.VfoFreqUpdate(vfo="B", hz=7_074_000)
+
+
+def test_encode_set_vfo_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        protocol.encode_set_vfo_a_hz(20_000)
+    with pytest.raises(ValueError):
+        protocol.encode_set_vfo_a_hz(80_000_000)
+
+
+def test_encode_read_vfo_a():
+    assert protocol.encode_read_vfo_a() == b"FA;"
+
+
+def test_encode_read_vfo_b():
+    assert protocol.encode_read_vfo_b() == b"FB;"

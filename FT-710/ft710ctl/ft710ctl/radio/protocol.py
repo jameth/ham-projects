@@ -42,10 +42,17 @@ class ScopeModeUpdate:
     mode: ScopeMode
 
 
+@dataclass(frozen=True)
+class VfoFreqUpdate:
+    vfo: str
+    hz: int
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
     "ScopeModeUpdate",
+    "VfoFreqUpdate",
     "UnknownFrame",
 ]
 
@@ -92,6 +99,42 @@ def encode_read_scope_mode() -> bytes:
     return b"SS06;"
 
 
+def _encode_set_vfo(prefix: str, hz: int) -> bytes:
+    if not (30_000 <= hz <= 75_000_000):
+        raise ValueError(f"frequency {hz} Hz out of range 30 kHz..75 MHz")
+    return f"{prefix}{hz:09d};".encode("ascii")
+
+
+def encode_set_vfo_a_hz(hz: int) -> bytes:
+    return _encode_set_vfo("FA", hz)
+
+
+def encode_set_vfo_b_hz(hz: int) -> bytes:
+    return _encode_set_vfo("FB", hz)
+
+
+def encode_read_vfo_a() -> bytes:
+    return b"FA;"
+
+
+def encode_read_vfo_b() -> bytes:
+    return b"FB;"
+
+
+def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
+    if len(frame) != 12 or frame[-1:] != b";":
+        return None
+    prefix = frame[:2]
+    if prefix not in (b"FA", b"FB"):
+        return None
+    digits = frame[2:11]
+    if not digits.isdigit():
+        return None
+    hz = int(digits)
+    vfo = "A" if prefix == b"FA" else "B"
+    return VfoFreqUpdate(vfo=vfo, hz=hz)
+
+
 def _parse_ref_level(frame: bytes) -> "ScopeRefLevelUpdate | None":
     if len(frame) != 10 or frame[:4] != b"SS04" or frame[-1:] != b";":
         return None
@@ -121,4 +164,7 @@ def decode(frame: bytes) -> RadioUpdate:
             return ScopeModeUpdate(mode=ScopeMode(digit))
         except ValueError:
             pass
+    vfo = _parse_vfo(frame)
+    if vfo is not None:
+        return vfo
     return UnknownFrame(raw=frame)
