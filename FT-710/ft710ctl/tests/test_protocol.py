@@ -195,3 +195,35 @@ def test_decode_attenuator(name, digit):
 
 def test_encode_read_attenuator():
     assert protocol.encode_read_attenuator() == b"RA0;"
+
+
+AGC_SET_CASES = [
+    ("OFF", "0"), ("FAST", "1"), ("MID", "2"), ("SLOW", "3"), ("AUTO", "4"),
+]
+AGC_REPORT_CASES = [
+    ("OFF", "0"), ("FAST", "1"), ("MID", "2"), ("SLOW", "3"),
+    ("AUTO_FAST", "4"), ("AUTO_MID", "5"), ("AUTO_SLOW", "6"),
+]
+
+
+@pytest.mark.parametrize("name,digit", AGC_SET_CASES)
+def test_encode_set_agc(name, digit):
+    setting = protocol.AgcSet[name]
+    assert protocol.encode_set_agc(setting) == f"GT0{digit};".encode("ascii")
+
+
+def test_encode_set_agc_rejects_auto_resolved():
+    # AUTO_FAST/MID/SLOW are Answer-only; not members of the Set enum.
+    # Attribute access on a missing Enum member raises AttributeError.
+    with pytest.raises(AttributeError):
+        protocol.AgcSet.AUTO_FAST  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("name,digit", AGC_REPORT_CASES)
+def test_decode_agc(name, digit):
+    report = protocol.AgcReport[name]
+    assert protocol.decode(f"GT0{digit};".encode("ascii")) == protocol.AgcUpdate(report=report)
+
+
+def test_encode_read_agc():
+    assert protocol.encode_read_agc() == b"GT0;"

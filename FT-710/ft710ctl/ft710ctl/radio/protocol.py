@@ -94,6 +94,29 @@ class AttenuatorUpdate:
     setting: Attenuator
 
 
+class AgcSet(Enum):
+    OFF = "0"
+    FAST = "1"
+    MID = "2"
+    SLOW = "3"
+    AUTO = "4"
+
+
+class AgcReport(Enum):
+    OFF = "0"
+    FAST = "1"
+    MID = "2"
+    SLOW = "3"
+    AUTO_FAST = "4"
+    AUTO_MID = "5"
+    AUTO_SLOW = "6"
+
+
+@dataclass(frozen=True)
+class AgcUpdate:
+    report: AgcReport
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
@@ -102,6 +125,7 @@ RadioUpdate = Union[
     "ModeUpdate",
     "PreampUpdate",
     "AttenuatorUpdate",
+    "AgcUpdate",
     "UnknownFrame",
 ]
 
@@ -194,6 +218,14 @@ def encode_read_attenuator() -> bytes:
     return b"RA0;"
 
 
+def encode_set_agc(setting: AgcSet) -> bytes:
+    return f"GT0{setting.value};".encode("ascii")
+
+
+def encode_read_agc() -> bytes:
+    return b"GT0;"
+
+
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
     if len(frame) != 12 or frame[-1:] != b";":
         return None
@@ -256,6 +288,12 @@ def decode(frame: bytes) -> RadioUpdate:
         digit = chr(frame[3])
         try:
             return AttenuatorUpdate(setting=Attenuator(digit))
+        except ValueError:
+            pass
+    if len(frame) == 5 and frame[:3] == b"GT0" and frame[-1:] == b";":
+        digit = chr(frame[3])
+        try:
+            return AgcUpdate(report=AgcReport(digit))
         except ValueError:
             pass
     return UnknownFrame(raw=frame)
