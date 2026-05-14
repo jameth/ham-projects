@@ -71,12 +71,24 @@ class ModeUpdate:
     mode: OperatingMode
 
 
+class Preamp(Enum):
+    IPO = "0"
+    AMP1 = "1"
+    AMP2 = "2"
+
+
+@dataclass(frozen=True)
+class PreampUpdate:
+    setting: Preamp
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
     "ScopeModeUpdate",
     "VfoFreqUpdate",
     "ModeUpdate",
+    "PreampUpdate",
     "UnknownFrame",
 ]
 
@@ -153,6 +165,14 @@ def encode_read_mode() -> bytes:
     return b"MD0;"
 
 
+def encode_set_preamp(setting: Preamp) -> bytes:
+    return f"PA0{setting.value};".encode("ascii")
+
+
+def encode_read_preamp() -> bytes:
+    return b"PA0;"
+
+
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
     if len(frame) != 12 or frame[-1:] != b";":
         return None
@@ -203,6 +223,12 @@ def decode(frame: bytes) -> RadioUpdate:
         digit = chr(frame[3])
         try:
             return ModeUpdate(mode=OperatingMode(digit))
+        except ValueError:
+            pass
+    if len(frame) == 5 and frame[:3] == b"PA0" and frame[-1:] == b";":
+        digit = chr(frame[3])
+        try:
+            return PreampUpdate(setting=Preamp(digit))
         except ValueError:
             pass
     return UnknownFrame(raw=frame)

@@ -153,3 +153,24 @@ def test_decode_mode(name, digit):
 
 def test_encode_read_mode():
     assert protocol.encode_read_mode() == b"MD0;"
+
+
+PREAMP_CASES = [
+    ("IPO", "0"), ("AMP1", "1"), ("AMP2", "2"),
+]
+
+
+@pytest.mark.parametrize("name,digit", PREAMP_CASES)
+def test_encode_set_preamp(name, digit):
+    setting = protocol.Preamp[name]
+    assert protocol.encode_set_preamp(setting) == f"PA0{digit};".encode("ascii")
+
+
+@pytest.mark.parametrize("name,digit", PREAMP_CASES)
+def test_decode_preamp(name, digit):
+    setting = protocol.Preamp[name]
+    assert protocol.decode(f"PA0{digit};".encode("ascii")) == protocol.PreampUpdate(setting=setting)
+
+
+def test_encode_read_preamp():
+    assert protocol.encode_read_preamp() == b"PA0;"
