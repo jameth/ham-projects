@@ -34,3 +34,38 @@ def test_encode_set_span_rejects_invalid():
 
 def test_encode_read_span():
     assert protocol.encode_read_span() == b"SS05;"
+
+
+LEVEL_CASES = [
+    (0.0, b"SS04+00.0;"),
+    (-30.0, b"SS04-30.0;"),
+    (30.0, b"SS04+30.0;"),
+    (-5.5, b"SS04-05.5;"),
+    (10.5, b"SS04+10.5;"),
+]
+
+
+@pytest.mark.parametrize("db,frame", LEVEL_CASES)
+def test_encode_set_ref_level(db, frame):
+    assert protocol.encode_set_ref_level_db(db) == frame
+
+
+@pytest.mark.parametrize("db,frame", LEVEL_CASES)
+def test_decode_ref_level(db, frame):
+    assert protocol.decode(frame) == protocol.ScopeRefLevelUpdate(level_db=db)
+
+
+def test_encode_set_ref_level_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        protocol.encode_set_ref_level_db(31.0)
+    with pytest.raises(ValueError):
+        protocol.encode_set_ref_level_db(-30.5)
+
+
+def test_encode_set_ref_level_rejects_non_half_step():
+    with pytest.raises(ValueError):
+        protocol.encode_set_ref_level_db(5.3)
+
+
+def test_encode_read_ref_level():
+    assert protocol.encode_read_ref_level() == b"SS04;"
