@@ -213,6 +213,16 @@ class SmeterUpdate:
     raw: int
 
 
+@dataclass(frozen=True)
+class AfGainUpdate:
+    value: int
+
+
+@dataclass(frozen=True)
+class RfGainUpdate:
+    value: int
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
@@ -236,6 +246,8 @@ RadioUpdate = Union[
     "IfShiftUpdate",
     "FilterWidthUpdate",
     "SmeterUpdate",
+    "AfGainUpdate",
+    "RfGainUpdate",
     "UnknownFrame",
 ]
 
@@ -494,6 +506,26 @@ def encode_read_smeter() -> bytes:
     return b"SM0;"
 
 
+def encode_set_af_gain(value: int) -> bytes:
+    if not (0 <= value <= 255):
+        raise ValueError(f"AF gain {value} out of range 0..255")
+    return f"AG0{value:03d};".encode("ascii")
+
+
+def encode_read_af_gain() -> bytes:
+    return b"AG0;"
+
+
+def encode_set_rf_gain(value: int) -> bytes:
+    if not (0 <= value <= 255):
+        raise ValueError(f"RF gain {value} out of range 0..255")
+    return f"RG0{value:03d};".encode("ascii")
+
+
+def encode_read_rf_gain() -> bytes:
+    return b"RG0;"
+
+
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
     if len(frame) != 12 or frame[-1:] != b";":
         return None
@@ -609,4 +641,12 @@ def decode(frame: bytes) -> RadioUpdate:
         raw = int(frame[3:6])
         if 0 <= raw <= 255:
             return SmeterUpdate(raw=raw)
+    if len(frame) == 7 and frame[:3] == b"AG0" and frame[-1:] == b";" and frame[3:6].isdigit():
+        v = int(frame[3:6])
+        if 0 <= v <= 255:
+            return AfGainUpdate(value=v)
+    if len(frame) == 7 and frame[:3] == b"RG0" and frame[-1:] == b";" and frame[3:6].isdigit():
+        v = int(frame[3:6])
+        if 0 <= v <= 255:
+            return RfGainUpdate(value=v)
     return UnknownFrame(raw=frame)

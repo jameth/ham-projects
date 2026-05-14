@@ -479,3 +479,30 @@ def test_decode_smeter():
     assert protocol.decode(b"SM0123;") == protocol.SmeterUpdate(raw=123)
     assert protocol.decode(b"SM0000;") == protocol.SmeterUpdate(raw=0)
     assert protocol.decode(b"SM0255;") == protocol.SmeterUpdate(raw=255)
+
+
+def test_encode_set_af_gain():
+    assert protocol.encode_set_af_gain(0) == b"AG0000;"
+    assert protocol.encode_set_af_gain(128) == b"AG0128;"
+    assert protocol.encode_set_af_gain(255) == b"AG0255;"
+
+
+def test_encode_set_af_gain_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        protocol.encode_set_af_gain(256)
+
+
+def test_encode_read_af_gain():
+    assert protocol.encode_read_af_gain() == b"AG0;"
+
+
+def test_decode_af_gain():
+    assert protocol.decode(b"AG0128;") == protocol.AfGainUpdate(value=128)
+
+
+def test_encode_set_rf_gain():
+    assert protocol.encode_set_rf_gain(128) == b"RG0128;"
+
+
+def test_encode_read_rf_gain():
+    assert protocol.encode_read_rf_gain() == b"RG0;"
