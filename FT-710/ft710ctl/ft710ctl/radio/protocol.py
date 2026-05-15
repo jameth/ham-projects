@@ -243,6 +243,12 @@ class SplitUpdate:
     enabled: bool
 
 
+@dataclass(frozen=True)
+class ClarUpdate:
+    rx_enabled: bool
+    tx_enabled: bool
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
@@ -269,6 +275,7 @@ RadioUpdate = Union[
     "AfGainUpdate",
     "RfGainUpdate",
     "SplitUpdate",
+    "ClarUpdate",
     "UnknownFrame",
 ]
 
@@ -563,6 +570,16 @@ def encode_read_split() -> bytes:
     return b"ST;"
 
 
+def encode_set_rx_clar(enabled: bool) -> bytes:
+    # P1=0 main band, P2=0, P3=0 CLAR setting mode, P4=RX, P5=TX (always 0 in v1), P6-P8=0.
+    p4 = "1" if enabled else "0"
+    return f"CF000{p4}0000;".encode("ascii")
+
+
+def encode_read_clar() -> bytes:
+    return b"CF000;"
+
+
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
     if len(frame) != 12 or frame[-1:] != b";":
         return None
@@ -688,4 +705,16 @@ def decode(frame: bytes) -> RadioUpdate:
             return RfGainUpdate(value=v)
     if len(frame) == 4 and frame[:2] == b"ST" and frame[-1:] == b";" and frame[2:3] in (b"0", b"1"):
         return SplitUpdate(enabled=(frame[2:3] == b"1"))
+    if (
+        len(frame) == 11
+        and frame[:5] == b"CF000"
+        and frame[-1:] == b";"
+        and frame[5:6] in (b"0", b"1")
+        and frame[6:7] in (b"0", b"1")
+        and frame[7:10] == b"000"
+    ):
+        return ClarUpdate(
+            rx_enabled=(frame[5:6] == b"1"),
+            tx_enabled=(frame[6:7] == b"1"),
+        )
     return UnknownFrame(raw=frame)

@@ -540,3 +540,33 @@ def test_encode_read_split():
 def test_decode_split():
     assert protocol.decode(b"ST1;") == protocol.SplitUpdate(enabled=True)
     assert protocol.decode(b"ST0;") == protocol.SplitUpdate(enabled=False)
+
+
+def test_encode_set_rx_clar_on():
+    # CF byte layout (manual p.8): C F P1 P2 P3 P4 P5 P6 P7 P8 ;
+    #   P1=0 (main band), P2=0 (fixed), P3=0 (CLAR setting mode),
+    #   P4=RX CLAR (0=OFF, 1=ON), P5=TX CLAR (0=OFF, 1=ON), P6-P8=0.
+    # RX CLAR ON, TX CLAR OFF -> P4=1, P5=0 -> CF00010000;
+    assert protocol.encode_set_rx_clar(True) == b"CF00010000;"
+
+
+def test_encode_set_rx_clar_off():
+    # RX CLAR OFF, TX CLAR OFF -> P4=0, P5=0 -> CF00000000;
+    assert protocol.encode_set_rx_clar(False) == b"CF00000000;"
+
+
+def test_encode_read_clar():
+    # CF read: C F P1 P2 P3 ;
+    assert protocol.encode_read_clar() == b"CF000;"
+
+
+def test_decode_clar_rx_on_tx_off():
+    update = protocol.decode(b"CF00010000;")
+    assert update.rx_enabled is True
+    assert update.tx_enabled is False
+
+
+def test_decode_clar_rx_off_tx_off():
+    update = protocol.decode(b"CF00000000;")
+    assert update.rx_enabled is False
+    assert update.tx_enabled is False
