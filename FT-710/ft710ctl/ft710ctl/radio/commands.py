@@ -55,3 +55,46 @@ class Radio:
         frame = protocol.encode_set_span_khz(khz)
         await self.port.send(frame)
         await self.port.send(protocol.encode_read_span())
+
+    async def set_ref_level_db(self, db: float) -> None:
+        frame = protocol.encode_set_ref_level_db(db)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_ref_level())
+
+    async def set_scope_mode(self, mode: protocol.ScopeMode) -> None:
+        _require_enum(mode, protocol.ScopeMode)
+        await self.port.send(protocol.encode_set_scope_mode(mode))
+        await self.port.send(protocol.encode_read_scope_mode())
+
+    async def set_scope_speed(self, speed: protocol.ScopeSpeed) -> None:
+        _require_enum(speed, protocol.ScopeSpeed)
+        await self.port.send(protocol.encode_set_scope_speed(speed))
+        await self.port.send(b"SS00;")
+
+    async def set_scope_peak(self, peak: protocol.ScopePeak) -> None:
+        _require_enum(peak, protocol.ScopePeak)
+        await self.port.send(protocol.encode_set_scope_peak(peak))
+        await self.port.send(b"SS01;")
+
+    async def set_scope_marker(self, enabled: bool) -> None:
+        await self.port.send(protocol.encode_set_scope_marker(enabled))
+        await self.port.send(b"SS02;")
+
+    async def set_scope_color(self, color: int) -> None:
+        frame = protocol.encode_set_scope_color(color)
+        await self.port.send(frame)
+        await self.port.send(b"SS03;")
+
+    async def set_af_fft_mode(
+        self, mode: protocol.AfFftMode, osc_time_index: int = 0
+    ) -> None:
+        _require_enum(mode, protocol.AfFftMode)
+        await self.port.send(
+            protocol.encode_set_af_fft_mode(mode, osc_time_index=osc_time_index)
+        )
+        await self.port.send(protocol.encode_read_af_fft())
+
+
+def _require_enum(value, cls) -> None:
+    if not isinstance(value, cls):
+        raise TypeError(f"expected {cls.__name__}, got {type(value).__name__}")
