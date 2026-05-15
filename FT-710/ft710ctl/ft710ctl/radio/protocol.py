@@ -204,6 +204,11 @@ class ScopePeak(Enum):
     LV5 = "4"
 
 
+@dataclass(frozen=True)
+class ScopePeakUpdate:
+    peak: "ScopePeak"
+
+
 class AfFftMode(Enum):
     AF_FFT_0DB = "0"
     AF_FFT_10DB = "1"
@@ -282,6 +287,7 @@ RadioUpdate = Union[
     "SplitUpdate",
     "ClarUpdate",
     "ScopeSpeedUpdate",
+    "ScopePeakUpdate",
     "UnknownFrame",
 ]
 
@@ -622,6 +628,11 @@ def decode(frame: bytes) -> RadioUpdate:
         if sub == b"00":
             try:
                 return ScopeSpeedUpdate(speed=ScopeSpeed(digit))
+            except ValueError:
+                pass
+        if sub == b"01":
+            try:
+                return ScopePeakUpdate(peak=ScopePeak(digit))
             except ValueError:
                 pass
     if len(frame) == 10 and frame[:4] == b"SS05" and frame[-1:] == b";":

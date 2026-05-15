@@ -436,6 +436,13 @@ def test_encode_set_scope_peak(name, digit):
     assert protocol.encode_set_scope_peak(peak) == f"SS01{digit}0000;".encode("ascii")
 
 
+@pytest.mark.parametrize("name,digit", SCOPE_PEAK_CASES)
+def test_decode_scope_peak(name, digit):
+    peak = protocol.ScopePeak[name]
+    frame = f"SS01{digit}0000;".encode("ascii")
+    assert protocol.decode(frame) == protocol.ScopePeakUpdate(peak=peak)
+
+
 def test_encode_set_scope_marker():
     assert protocol.encode_set_scope_marker(True) == b"SS0210000;"
     assert protocol.encode_set_scope_marker(False) == b"SS0200000;"
@@ -600,3 +607,5 @@ def test_decode_known_prefix_wrong_length():
     assert protocol.decode(b"FA12345;") == protocol.UnknownFrame(raw=b"FA12345;")
     # SS00 Answer needs 10 bytes; this 9-byte frame must fall through
     assert protocol.decode(b"SS00000;") == protocol.UnknownFrame(raw=b"SS00000;")
+    # SS01 Answer with wrong padding (5 chars after sub-id instead of 5 with trailing 0000) → unknown
+    assert protocol.decode(b"SS0100001;") == protocol.UnknownFrame(raw=b"SS0100001;")
