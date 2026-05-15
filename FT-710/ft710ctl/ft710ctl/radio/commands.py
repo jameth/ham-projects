@@ -23,6 +23,10 @@ class Radio:
         # enqueued, decremented when the consumer applies a non-None update.
         # /api/raw uses this to wait until no expected answers are in flight.
         self._outstanding_reads: int = 0
+        # single_shot serialization + consumer-pause capture.
+        self._single_shot_lock = asyncio.Lock()
+        self._consumer_paused = False
+        self._captured_frame: asyncio.Future[bytes] | None = None
 
     async def _enqueue_read(self, frame: bytes) -> None:
         self._outstanding_reads += 1
@@ -50,6 +54,15 @@ class Radio:
                 frame = await self.port.next_frame()
             except PortClosed:
                 return
+            # While a single_shot is in flight, route the next inbound
+            # frame to its captured Future instead of applying it.
+            if (
+                self._consumer_paused
+                and self._captured_frame is not None
+                and not self._captured_frame.done()
+            ):
+                self._captured_frame.set_result(frame)
+                continue
             update = protocol.decode(frame)
             delta = self.state.apply(update)
             if delta is not None:
@@ -215,6 +228,35 @@ class Radio:
         """Read every v1-tracked field once. Sequenced by the writer's gap."""
         for frame in _SNAPSHOT_READS:
             await self._enqueue_read(frame)
+
+    async def _wait_quiescence(self, timeout: float) -> None:
+        """Poll until outstanding_reads drops to 0, or timeout elapses."""
+        loop = asyncio.get_event_loop()
+        deadline = loop.time() + timeout
+        while self._outstanding_reads > 0:
+            if loop.time() >= deadline:
+                return  # defensive: best-effort wait
+            await asyncio.sleep(0.01)
+
+    async def single_shot(self, frame: bytes, timeout: float = 1.0) -> bytes:
+        """Send `frame` and return the radio's next response frame.
+
+        Used by /api/raw. Serializes against itself via a lock, waits for
+        quiescence (no in-flight read-backs), then pauses the normal
+        consumer for one frame so the answer reaches the caller instead
+        of the state dispatcher.
+        """
+        async with self._single_shot_lock:
+            await self._wait_quiescence(timeout=timeout)
+            loop = asyncio.get_event_loop()
+            self._captured_frame = loop.create_future()
+            self._consumer_paused = True
+            try:
+                await self.port.send(frame)
+                return await asyncio.wait_for(self._captured_frame, timeout=timeout)
+            finally:
+                self._consumer_paused = False
+                self._captured_frame = None
 
 
 _SNAPSHOT_READS: tuple[bytes, ...] = (
