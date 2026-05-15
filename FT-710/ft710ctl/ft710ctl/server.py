@@ -6,7 +6,9 @@ live Radio guard for that explicitly.
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Awaitable, Callable, Optional
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -93,18 +95,25 @@ async def _dispatch_set(radio, field: str, value) -> None:
 _WEB_DIR = Path(__file__).parent / "web"
 
 
-def create_app(radio=None, manage_radio_lifecycle: bool = False) -> FastAPI:
-    app = FastAPI(title="ft710ctl")
-    app.state.radio = radio
-
-    if manage_radio_lifecycle and radio is not None:
-        @app.on_event("startup")
-        async def _radio_startup() -> None:
+def create_app(
+    radio=None,
+    manage_radio_lifecycle: bool = False,
+    on_startup: Optional[Callable[[], Awaitable[None]]] = None,
+) -> FastAPI:
+    @asynccontextmanager
+    async def _lifespan(app: FastAPI):
+        if manage_radio_lifecycle and radio is not None:
             await radio.start()
+        if on_startup is not None:
+            await on_startup()
+        try:
+            yield
+        finally:
+            if manage_radio_lifecycle and radio is not None:
+                await radio.stop()
 
-        @app.on_event("shutdown")
-        async def _radio_shutdown() -> None:
-            await radio.stop()
+    app = FastAPI(title="ft710ctl", lifespan=_lifespan)
+    app.state.radio = radio
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -150,7 +159,7 @@ def create_app(radio=None, manage_radio_lifecycle: bool = False) -> FastAPI:
         # Initial port state so the UI can render the banner immediately.
         await websocket.send_json({"op": "port", "state": radio.port_state})
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         def _on_delta(delta: dict) -> None:
             # Fired from the consumer task. Schedule send on the same loop.

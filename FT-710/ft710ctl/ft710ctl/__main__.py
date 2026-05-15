@@ -111,12 +111,8 @@ def main() -> None:
 
     factory = _make_dead_factory() if args.no_radio else _make_serial_factory(args.port, args.baud)
     radio = Radio(factory=factory)
-    app = create_app(radio=radio, manage_radio_lifecycle=True)
-
-    if not args.no_radio:
-        @app.on_event("startup")
-        async def _initial_snapshot():
-            await radio.snapshot()
+    on_startup = None if args.no_radio else radio.snapshot
+    app = create_app(radio=radio, manage_radio_lifecycle=True, on_startup=on_startup)
 
     uvicorn.run(app, host="127.0.0.1", port=args.http_port, log_level="info")
 

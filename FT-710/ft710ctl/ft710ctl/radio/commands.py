@@ -276,7 +276,7 @@ class Radio:
 
     async def _wait_quiescence(self, timeout: float) -> None:
         """Poll until outstanding_reads drops to 0, or timeout elapses."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         while self._outstanding_reads > 0:
             if loop.time() >= deadline:
@@ -293,7 +293,7 @@ class Radio:
         """
         async with self._single_shot_lock:
             await self._wait_quiescence(timeout=timeout)
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             self._captured_frame = loop.create_future()
             self._consumer_paused = True
             try:
