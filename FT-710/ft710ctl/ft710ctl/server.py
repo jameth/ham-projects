@@ -1,0 +1,26 @@
+"""FastAPI app factory.
+
+`radio` may be None for shell / health-only tests; routes that need a
+live Radio guard for that explicitly.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
+
+_WEB_DIR = Path(__file__).parent / "web"
+
+
+def create_app(radio=None) -> FastAPI:
+    app = FastAPI(title="ft710ctl")
+    app.state.radio = radio
+
+    @app.get("/health")
+    async def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    app.mount("/", StaticFiles(directory=str(_WEB_DIR), html=True), name="web")
+    return app
