@@ -545,9 +545,14 @@ def encode_set_scope_color(color: int) -> bytes:
     return f"SS03{digit}0000;".encode("ascii")
 
 
-def encode_set_af_fft_mode(mode: AfFftMode) -> bytes:
-    # P3 = mode.value, P4 = 0 (fixed), P5 = 0 (OSC time, default 1ms), P6,P7 = 0.
-    return f"SS07{mode.value}00000;".encode("ascii")
+def encode_set_af_fft_mode(mode: AfFftMode, osc_time_index: int = 0) -> bytes:
+    # SS07 10-byte frame: SS 0 7 P3 P4 P5 P6 P7 ;
+    #   P3       = mode digit (AF-FFT/OSC level)
+    #   P4 - P5  = 2-digit OSC time index "00".."05" (1/3/10/30/100/300 ms)
+    #   P6 - P7  = fixed "00"
+    if not (0 <= osc_time_index <= 5):
+        raise ValueError(f"osc_time_index {osc_time_index} out of range 0..5")
+    return f"SS07{mode.value}{osc_time_index:02d}00;".encode("ascii")
 
 
 def encode_read_af_fft() -> bytes:

@@ -475,11 +475,10 @@ def test_encode_set_scope_color_rejects_out_of_range():
 
 
 # SS07 byte layout per CAT manual p.21:
-#   SS 0 7 P3 P4 P5 P6 P7 ;
-#   P3 = AF-FFT/OSC level mode (0..5)
-#   P4 = fixed 0
-#   P5 = OSC Time (0=1ms .. 5=300ms); when reading AF-FFT, leave 0
-#   P6, P7 = fixed 0
+#   SS 0 7 P3 P4 P5 P6 P7 ;     (10 bytes total)
+#   P3       = AF-FFT/OSC level mode digit (0..5)
+#   P4 - P5  = 2-digit OSC time index "00".."05" (1/3/10/30/100/300 ms)
+#   P6 - P7  = fixed "00"
 AF_FFT_CASES = [
     ("AF_FFT_0DB", 0), ("AF_FFT_10DB", 1), ("AF_FFT_20DB", 2),
     ("OSC_0DB", 3), ("OSC_10DB", 4), ("OSC_20DB", 5),
@@ -489,7 +488,17 @@ AF_FFT_CASES = [
 @pytest.mark.parametrize("name,digit", AF_FFT_CASES)
 def test_encode_set_af_fft_mode(name, digit):
     mode = protocol.AfFftMode[name]
-    assert protocol.encode_set_af_fft_mode(mode) == f"SS07{digit}00000;".encode("ascii")
+    assert protocol.encode_set_af_fft_mode(mode) == f"SS07{digit}0000;".encode("ascii")
+
+
+def test_encode_set_af_fft_mode_with_osc_time():
+    # OSC_0DB mode (digit "3") at osc_time_index=2 → b"SS0730200;" (10 bytes)
+    assert protocol.encode_set_af_fft_mode(protocol.AfFftMode.OSC_0DB, osc_time_index=2) == b"SS0730200;"
+
+
+def test_encode_set_af_fft_mode_rejects_invalid_osc_time():
+    with pytest.raises(ValueError):
+        protocol.encode_set_af_fft_mode(protocol.AfFftMode.AF_FFT_0DB, osc_time_index=6)
 
 
 def test_encode_read_af_fft():
