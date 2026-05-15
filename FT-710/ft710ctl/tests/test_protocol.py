@@ -570,3 +570,24 @@ def test_decode_clar_rx_off_tx_off():
     update = protocol.decode(b"CF00000000;")
     assert update.rx_enabled is False
     assert update.tx_enabled is False
+
+
+def test_decode_truncated_frame():
+    assert protocol.decode(b"FA01") == protocol.UnknownFrame(raw=b"FA01")
+
+
+def test_decode_empty():
+    assert protocol.decode(b"") == protocol.UnknownFrame(raw=b"")
+
+
+def test_decode_non_ascii():
+    assert protocol.decode(b"\xff\xfe;") == protocol.UnknownFrame(raw=b"\xff\xfe;")
+
+
+def test_decode_unknown_two_letter_prefix():
+    assert protocol.decode(b"ZZ0;") == protocol.UnknownFrame(raw=b"ZZ0;")
+
+
+def test_decode_known_prefix_wrong_length():
+    # FA needs exactly 12 bytes
+    assert protocol.decode(b"FA12345;") == protocol.UnknownFrame(raw=b"FA12345;")
