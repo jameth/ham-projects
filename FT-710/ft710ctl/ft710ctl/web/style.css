@@ -61,7 +61,15 @@ h1 {
 
 .banner--connected .banner__dot { background: var(--green); }
 .banner--disconnected .banner__dot { background: var(--red); }
-.banner--connecting .banner__dot { background: var(--yellow); }
+.banner--connecting .banner__dot {
+  background: var(--yellow);
+  animation: banner-pulse 1s ease-in-out infinite;
+}
+
+@keyframes banner-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
 
 main {
   display: grid;

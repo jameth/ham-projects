@@ -136,7 +136,12 @@ function connect() {
       p.reject(new Error("socket closed"));
     }
     pendingRequests.clear();
-    setTimeout(connect, reconnectDelay);
+    // Walk the banner through "connecting" before the next attempt opens,
+    // so the user can see the retry sequence visually.
+    setTimeout(() => {
+      setBanner("connecting");
+      connect();
+    }, reconnectDelay);
     reconnectDelay = Math.min(RECONNECT_MAX, reconnectDelay * 2);
   });
   ws.addEventListener("error", (ev) => {
