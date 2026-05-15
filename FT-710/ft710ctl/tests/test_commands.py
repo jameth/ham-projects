@@ -724,3 +724,52 @@ async def test_set_rx_clar_off_round_trip():
     await asyncio.sleep(0.05)
     assert radio.state.tuning.clar_rx_enabled is False
     await radio.stop()
+
+
+# ---------- snapshot + broadcast ----------
+
+
+async def test_snapshot_issues_every_v1_read():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.snapshot()
+    await asyncio.sleep(0.05)
+    expected = [
+        b"SS05;", b"SS04;", b"SS06;", b"SS00;", b"SS01;", b"SS02;", b"SS03;", b"SS07;",
+        b"FA;", b"FB;", b"MD0;", b"ST;",
+        b"PA0;", b"RA0;", b"GT0;",
+        b"NB0;", b"NL0;", b"NR0;", b"RL0;",
+        b"BP00;", b"BP01;",
+        b"BC0;",
+        b"CO00;", b"CO01;", b"CO02;", b"CO03;",
+        b"IS0;", b"SH0;",
+        b"SM0;", b"AG0;", b"RG0;",
+        b"CF000;",
+    ]
+    for frame in expected:
+        assert frame in fs.writes, f"snapshot missing read: {frame}"
+    await radio.stop()
+
+
+async def test_snapshot_is_sequenced_not_parallel():
+    """Each read is sent in order; the writer drains the queue serially."""
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0.005)
+    await radio.start()
+    await radio.snapshot()
+    await asyncio.sleep(0.5)  # let writer drain with 5 ms gap × 32 reads
+    assert fs.writes[0] == b"SS05;"
+    await radio.stop()
+
+
+async def test_state_change_publishes_to_subscriber():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    received: list[dict] = []
+    radio.subscribe(received.append)
+    await radio.start()
+    await fs.push(b"SS0560000;")
+    await asyncio.sleep(0.05)
+    assert received == [{"field": "scope.span_khz", "value": 100}]
+    await radio.stop()

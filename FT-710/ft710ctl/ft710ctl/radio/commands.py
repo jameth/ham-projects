@@ -215,6 +215,30 @@ class Radio:
         await self.port.send(protocol.encode_set_rx_clar(enabled))
         await self.port.send(protocol.encode_read_clar())
 
+    async def snapshot(self) -> None:
+        """Read every v1-tracked field once. Sequenced by the writer's gap."""
+        for frame in _SNAPSHOT_READS:
+            await self.port.send(frame)
+
+
+_SNAPSHOT_READS: tuple[bytes, ...] = (
+    # Scope
+    b"SS05;", b"SS04;", b"SS06;", b"SS00;", b"SS01;", b"SS02;", b"SS03;", b"SS07;",
+    # Tuning
+    b"FA;", b"FB;", b"MD0;", b"ST;",
+    # RX DSP
+    b"PA0;", b"RA0;", b"GT0;",
+    b"NB0;", b"NL0;", b"NR0;", b"RL0;",
+    b"BP00;", b"BP01;",
+    b"BC0;",
+    b"CO00;", b"CO01;", b"CO02;", b"CO03;",
+    b"IS0;", b"SH0;",
+    # Meters + gain
+    b"SM0;", b"AG0;", b"RG0;",
+    # CLAR
+    b"CF000;",
+)
+
 
 def _require_enum(value, cls) -> None:
     if not isinstance(value, cls):
