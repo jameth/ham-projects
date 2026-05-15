@@ -448,6 +448,11 @@ def test_encode_set_scope_marker():
     assert protocol.encode_set_scope_marker(False) == b"SS0200000;"
 
 
+def test_decode_scope_marker():
+    assert protocol.decode(b"SS0210000;") == protocol.ScopeMarkerUpdate(enabled=True)
+    assert protocol.decode(b"SS0200000;") == protocol.ScopeMarkerUpdate(enabled=False)
+
+
 SCOPE_COLOR_CASES = [
     (1, "0"), (2, "1"), (10, "9"), (11, "A"),
 ]
@@ -609,3 +614,5 @@ def test_decode_known_prefix_wrong_length():
     assert protocol.decode(b"SS00000;") == protocol.UnknownFrame(raw=b"SS00000;")
     # SS01 Answer with wrong padding (5 chars after sub-id instead of 5 with trailing 0000) → unknown
     assert protocol.decode(b"SS0100001;") == protocol.UnknownFrame(raw=b"SS0100001;")
+    # SS02 with P3 not 0/1 → unknown (digit "2" is not a valid marker state)
+    assert protocol.decode(b"SS0220000;") == protocol.UnknownFrame(raw=b"SS0220000;")
