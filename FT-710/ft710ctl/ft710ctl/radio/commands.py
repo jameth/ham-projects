@@ -94,6 +94,35 @@ class Radio:
         )
         await self.port.send(protocol.encode_read_af_fft())
 
+    async def set_vfo_a_hz(self, hz: int) -> None:
+        frame = protocol.encode_set_vfo_a_hz(hz)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_vfo_a())
+
+    async def set_vfo_b_hz(self, hz: int) -> None:
+        frame = protocol.encode_set_vfo_b_hz(hz)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_vfo_b())
+
+    async def set_mode(self, mode: protocol.OperatingMode) -> None:
+        _require_enum(mode, protocol.OperatingMode)
+        await self.port.send(protocol.encode_set_mode(mode))
+        await self.port.send(protocol.encode_read_mode())
+
+    async def set_band(self, band: protocol.Band) -> None:
+        _require_enum(band, protocol.Band)
+        # BS has no Read form per manual; band change is reflected through
+        # VFO/mode reads that snapshot will pick up. Send the Set frame only.
+        await self.port.send(protocol.encode_set_band(band))
+
+    async def swap_vfo(self) -> None:
+        # No Read form. The post-swap state surface refreshes via snapshot.
+        await self.port.send(protocol.encode_swap_vfo())
+
+    async def set_split(self, enabled: bool) -> None:
+        await self.port.send(protocol.encode_set_split(enabled))
+        await self.port.send(protocol.encode_read_split())
+
 
 def _require_enum(value, cls) -> None:
     if not isinstance(value, cls):
