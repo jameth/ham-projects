@@ -188,7 +188,150 @@
 
     <section class="panel" id="rx-panel">
       <h2>RX DSP</h2>
-      <div class="panel__placeholder">populated in Task 38</div>
+
+      <div class="field">
+        <label>Preamp</label>
+        <div class="radio-group" data-field="rx.preamp">
+          <button data-value="IPO">IPO</button>
+          <button data-value="AMP1">AMP1</button>
+          <button data-value="AMP2">AMP2</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Attenuator</label>
+        <div class="radio-group" data-field="rx.attenuator">
+          <button data-value="OFF">Off</button>
+          <button data-value="DB6">6 dB</button>
+          <button data-value="DB12">12 dB</button>
+          <button data-value="DB18">18 dB</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>AGC</label>
+        <div class="radio-group" data-field="rx.agc" data-set-as="AgcSet">
+          <button data-value="OFF">Off</button>
+          <button data-value="FAST">Fast</button>
+          <button data-value="MID">Mid</button>
+          <button data-value="SLOW">Slow</button>
+          <button data-value="AUTO">Auto</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="rx-nb">NB</label>
+        <input type="checkbox" id="rx-nb" data-field="rx.nb_enabled" />
+      </div>
+
+      <div class="field">
+        <label for="rx-nb-level">NB level</label>
+        <input
+          type="range" id="rx-nb-level"
+          min="0" max="10" step="1" value="0"
+          data-field="rx.nb_level"
+        />
+      </div>
+
+      <div class="field">
+        <label for="rx-nr">NR</label>
+        <input type="checkbox" id="rx-nr" data-field="rx.nr_enabled" />
+      </div>
+
+      <div class="field">
+        <label for="rx-nr-level">NR level</label>
+        <input
+          type="range" id="rx-nr-level"
+          min="1" max="15" step="1" value="1"
+          data-field="rx.nr_level"
+        />
+      </div>
+
+      <div class="field">
+        <label for="rx-auto-notch">Auto Notch</label>
+        <input type="checkbox" id="rx-auto-notch" data-field="rx.auto_notch_enabled" />
+      </div>
+
+      <div class="field">
+        <label for="rx-notch">Notch</label>
+        <input type="checkbox" id="rx-notch" data-field="rx.manual_notch_enabled" />
+      </div>
+
+      <div class="field">
+        <label for="rx-notch-freq">Notch freq (Hz)</label>
+        <input
+          type="number" id="rx-notch-freq"
+          min="10" max="3200" step="10" value="10"
+          data-field="rx.manual_notch_freq_hz"
+        />
+      </div>
+
+      <div class="field">
+        <label for="rx-contour">Contour</label>
+        <input type="checkbox" id="rx-contour" data-field="rx.contour_enabled" />
+      </div>
+
+      <div class="field">
+        <label for="rx-contour-freq">Contour freq (Hz)</label>
+        <input
+          type="number" id="rx-contour-freq"
+          min="10" max="3200" step="10" value="10"
+          data-field="rx.contour_freq_hz"
+        />
+      </div>
+
+      <div class="field">
+        <label for="rx-apf">APF</label>
+        <input type="checkbox" id="rx-apf" data-field="rx.apf_enabled" />
+      </div>
+
+      <div class="field">
+        <label for="rx-apf-freq">APF freq (Hz)</label>
+        <input
+          type="number" id="rx-apf-freq"
+          min="-250" max="250" step="10" value="0"
+          data-field="rx.apf_freq_hz"
+        />
+      </div>
+
+      <div class="field">
+        <label for="rx-if-shift">IF shift (Hz)</label>
+        <input
+          type="range" id="rx-if-shift"
+          min="-1200" max="1200" step="20" value="0"
+          data-field="rx.if_shift_hz"
+        />
+      </div>
+
+      <div class="field">
+        <label for="rx-filter-width">Filter width</label>
+        <select id="rx-filter-width" data-field="rx.filter_width_index">
+          <option value="0">0 (narrowest)</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="12">12</option>
+          <option value="13">13</option>
+          <option value="14">14</option>
+          <option value="15">15</option>
+          <option value="16">16</option>
+          <option value="17">17</option>
+          <option value="18">18</option>
+          <option value="19">19</option>
+          <option value="20">20</option>
+          <option value="21">21</option>
+          <option value="22">22</option>
+          <option value="23">23 (widest)</option>
+        </select>
+      </div>
     </section>
 
     <section class="panel panel--meters" id="meters-panel">

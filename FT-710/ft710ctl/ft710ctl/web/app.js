@@ -216,6 +216,7 @@ function pushIntoElement(el, value) {
 
 function bindDataFieldElements() {
   document.querySelectorAll("[data-field]").forEach((el) => {
+    if (el.classList.contains("radio-group")) return;  // handled below
     const field = el.dataset.field;
     const eventName =
       el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input";
@@ -223,6 +224,19 @@ function bindDataFieldElements() {
       const value = coerceFromInput(el);
       sendSet(field, value).catch((err) => {
         console.warn(`set ${field}=${value} failed:`, err.message);
+      });
+    });
+  });
+
+  // Radio-group button widgets: clicking a button sends its data-value.
+  document.querySelectorAll(".radio-group[data-field]").forEach((group) => {
+    const field = group.dataset.field;
+    group.querySelectorAll("button[data-value]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const value = btn.dataset.value;
+        sendSet(field, value).catch((err) => {
+          console.warn(`set ${field}=${value} failed:`, err.message);
+        });
       });
     });
   });
@@ -240,13 +254,31 @@ function bindDataFieldElements() {
 
 function renderDataFieldElements() {
   document.querySelectorAll("[data-field]").forEach((el) => {
-    // Some fields are write-only from the UI's perspective (band has no Read);
-    // skip echoing state into them entirely.
     if (el.dataset.setOnly === "true") return;
+    if (el.classList.contains("radio-group")) return;
     const value = getFieldValue(el.dataset.field);
     pushIntoElement(el, value);
   });
 }
+
+// AGC's Set form has 5 options, the Answer maps AUTO → AUTO_FAST/MID/SLOW.
+// When state holds an AUTO_* value, highlight the AUTO button.
+const AGC_AUTO_REPORTS = new Set(["AUTO_FAST", "AUTO_MID", "AUTO_SLOW"]);
+
+function renderRadioGroups() {
+  document.querySelectorAll(".radio-group[data-field]").forEach((group) => {
+    const field = group.dataset.field;
+    let value = getFieldValue(field);
+    if (group.dataset.setAs === "AgcSet" && AGC_AUTO_REPORTS.has(value)) {
+      value = "AUTO";
+    }
+    group.querySelectorAll("button[data-value]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.value === value);
+    });
+  });
+}
+
+registerRenderer(renderRadioGroups);
 
 // Scope: keep the ref-level display label in sync with the slider.
 function renderScopeRefDisplay() {
