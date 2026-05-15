@@ -123,6 +123,82 @@ class Radio:
         await self.port.send(protocol.encode_set_split(enabled))
         await self.port.send(protocol.encode_read_split())
 
+    # ---------- RX DSP ----------
+
+    async def set_preamp(self, setting: protocol.Preamp) -> None:
+        _require_enum(setting, protocol.Preamp)
+        await self.port.send(protocol.encode_set_preamp(setting))
+        await self.port.send(protocol.encode_read_preamp())
+
+    async def set_attenuator(self, setting: protocol.Attenuator) -> None:
+        _require_enum(setting, protocol.Attenuator)
+        await self.port.send(protocol.encode_set_attenuator(setting))
+        await self.port.send(protocol.encode_read_attenuator())
+
+    async def set_agc(self, setting: protocol.AgcSet) -> None:
+        _require_enum(setting, protocol.AgcSet)
+        await self.port.send(protocol.encode_set_agc(setting))
+        await self.port.send(protocol.encode_read_agc())
+
+    async def set_nb(self, enabled: bool) -> None:
+        await self.port.send(protocol.encode_set_nb(enabled))
+        await self.port.send(protocol.encode_read_nb())
+
+    async def set_nb_level(self, level: int) -> None:
+        frame = protocol.encode_set_nb_level(level)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_nb_level())
+
+    async def set_nr(self, enabled: bool) -> None:
+        await self.port.send(protocol.encode_set_nr(enabled))
+        await self.port.send(protocol.encode_read_nr())
+
+    async def set_nr_level(self, level: int) -> None:
+        frame = protocol.encode_set_nr_level(level)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_nr_level())
+
+    async def set_manual_notch(self, enabled: bool) -> None:
+        await self.port.send(protocol.encode_set_manual_notch(enabled))
+        await self.port.send(protocol.encode_read_manual_notch_state())
+
+    async def set_manual_notch_freq_hz(self, freq_hz: int) -> None:
+        frame = protocol.encode_set_manual_notch_freq_hz(freq_hz)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_manual_notch_freq())
+
+    async def set_auto_notch(self, enabled: bool) -> None:
+        await self.port.send(protocol.encode_set_auto_notch(enabled))
+        await self.port.send(protocol.encode_read_auto_notch())
+
+    async def set_contour(self, enabled: bool) -> None:
+        await self.port.send(protocol.encode_set_contour(enabled))
+        await self.port.send(protocol.encode_read_contour_state())
+
+    async def set_contour_freq_hz(self, freq_hz: int) -> None:
+        frame = protocol.encode_set_contour_freq_hz(freq_hz)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_contour_freq())
+
+    async def set_apf(self, enabled: bool) -> None:
+        await self.port.send(protocol.encode_set_apf(enabled))
+        await self.port.send(protocol.encode_read_apf_state())
+
+    async def set_apf_freq_hz(self, freq_hz: int) -> None:
+        frame = protocol.encode_set_apf_freq_hz(freq_hz)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_apf_freq())
+
+    async def set_if_shift_hz(self, shift_hz: int) -> None:
+        frame = protocol.encode_set_if_shift_hz(shift_hz)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_if_shift())
+
+    async def set_filter_width(self, index: int) -> None:
+        frame = protocol.encode_set_filter_width(index)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_filter_width())
+
 
 def _require_enum(value, cls) -> None:
     if not isinstance(value, cls):

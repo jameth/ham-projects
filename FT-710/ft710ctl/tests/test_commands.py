@@ -308,3 +308,351 @@ async def test_set_split_off_round_trip():
     await asyncio.sleep(0.05)
     assert radio.state.tuning.split is False
     await radio.stop()
+
+
+# ---------- RX DSP ----------
+
+
+async def test_set_preamp_round_trip():
+    from ft710ctl.radio import protocol
+    fs = FakeSerial()
+    fs.on(b"PA0;", b"PA01;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_preamp(protocol.Preamp.AMP1)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.preamp == protocol.Preamp.AMP1
+    await radio.stop()
+
+
+async def test_set_preamp_non_enum_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(TypeError):
+        await radio.set_preamp("AMP1")
+    assert fs.writes == []
+    await radio.stop()
+
+
+async def test_set_attenuator_round_trip():
+    from ft710ctl.radio import protocol
+    fs = FakeSerial()
+    fs.on(b"RA0;", b"RA02;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_attenuator(protocol.Attenuator.DB12)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.attenuator == protocol.Attenuator.DB12
+    await radio.stop()
+
+
+async def test_set_attenuator_non_enum_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(TypeError):
+        await radio.set_attenuator("DB12")
+    assert fs.writes == []
+    await radio.stop()
+
+
+async def test_set_agc_round_trip():
+    from ft710ctl.radio import protocol
+    fs = FakeSerial()
+    fs.on(b"GT0;", b"GT04;")  # Set AUTO → Answer AUTO-FAST (4)
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_agc(protocol.AgcSet.AUTO)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.agc == protocol.AgcReport.AUTO_FAST
+    await radio.stop()
+
+
+async def test_set_agc_non_enum_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(TypeError):
+        await radio.set_agc("AUTO")
+    assert fs.writes == []
+    await radio.stop()
+
+
+async def test_set_nb_on_round_trip():
+    fs = FakeSerial()
+    fs.on(b"NB0;", b"NB01;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_nb(True)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.nb_enabled is True
+    await radio.stop()
+
+
+async def test_set_nb_off_round_trip():
+    fs = FakeSerial()
+    fs.on(b"NB0;", b"NB00;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_nb(False)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.nb_enabled is False
+    await radio.stop()
+
+
+async def test_set_nb_level_round_trip():
+    fs = FakeSerial()
+    fs.on(b"NL0;", b"NL0005;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_nb_level(5)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.nb_level == 5
+    await radio.stop()
+
+
+async def test_set_nb_level_invalid_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(ValueError):
+        await radio.set_nb_level(11)
+    assert fs.writes == []
+    await radio.stop()
+
+
+async def test_set_nr_on_round_trip():
+    fs = FakeSerial()
+    fs.on(b"NR0;", b"NR01;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_nr(True)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.nr_enabled is True
+    await radio.stop()
+
+
+async def test_set_nr_off_round_trip():
+    fs = FakeSerial()
+    fs.on(b"NR0;", b"NR00;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_nr(False)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.nr_enabled is False
+    await radio.stop()
+
+
+async def test_set_nr_level_round_trip():
+    fs = FakeSerial()
+    fs.on(b"RL0;", b"RL010;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_nr_level(10)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.nr_level == 10
+    await radio.stop()
+
+
+async def test_set_nr_level_invalid_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(ValueError):
+        await radio.set_nr_level(0)
+    assert fs.writes == []
+    await radio.stop()
+
+
+async def test_set_manual_notch_on_round_trip():
+    fs = FakeSerial()
+    fs.on(b"BP00;", b"BP00001;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_manual_notch(True)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.manual_notch_enabled is True
+    await radio.stop()
+
+
+async def test_set_manual_notch_off_round_trip():
+    fs = FakeSerial()
+    fs.on(b"BP00;", b"BP00000;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_manual_notch(False)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.manual_notch_enabled is False
+    await radio.stop()
+
+
+async def test_set_manual_notch_freq_round_trip():
+    fs = FakeSerial()
+    fs.on(b"BP01;", b"BP01150;")  # 1500 Hz
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_manual_notch_freq_hz(1500)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.manual_notch_freq_hz == 1500
+    await radio.stop()
+
+
+async def test_set_manual_notch_freq_invalid_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(ValueError):
+        await radio.set_manual_notch_freq_hz(5)
+    assert fs.writes == []
+    await radio.stop()
+
+
+async def test_set_auto_notch_on_round_trip():
+    fs = FakeSerial()
+    fs.on(b"BC0;", b"BC01;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_auto_notch(True)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.auto_notch_enabled is True
+    await radio.stop()
+
+
+async def test_set_auto_notch_off_round_trip():
+    fs = FakeSerial()
+    fs.on(b"BC0;", b"BC00;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_auto_notch(False)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.auto_notch_enabled is False
+    await radio.stop()
+
+
+async def test_set_contour_on_round_trip():
+    fs = FakeSerial()
+    fs.on(b"CO00;", b"CO000001;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_contour(True)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.contour_enabled is True
+    await radio.stop()
+
+
+async def test_set_contour_off_round_trip():
+    fs = FakeSerial()
+    fs.on(b"CO00;", b"CO000000;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_contour(False)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.contour_enabled is False
+    await radio.stop()
+
+
+async def test_set_contour_freq_round_trip():
+    fs = FakeSerial()
+    fs.on(b"CO01;", b"CO011500;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_contour_freq_hz(1500)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.contour_freq_hz == 1500
+    await radio.stop()
+
+
+async def test_set_contour_freq_invalid_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(ValueError):
+        await radio.set_contour_freq_hz(3201)
+    assert fs.writes == []
+    await radio.stop()
+
+
+async def test_set_apf_on_round_trip():
+    fs = FakeSerial()
+    fs.on(b"CO02;", b"CO020001;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_apf(True)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.apf_enabled is True
+    await radio.stop()
+
+
+async def test_set_apf_off_round_trip():
+    fs = FakeSerial()
+    fs.on(b"CO02;", b"CO020000;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_apf(False)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.apf_enabled is False
+    await radio.stop()
+
+
+async def test_set_apf_freq_round_trip():
+    fs = FakeSerial()
+    fs.on(b"CO03;", b"CO030025;")  # 0 Hz center
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_apf_freq_hz(0)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.apf_freq_hz == 0
+    await radio.stop()
+
+
+async def test_set_apf_freq_invalid_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(ValueError):
+        await radio.set_apf_freq_hz(300)
+    assert fs.writes == []
+    await radio.stop()
+
+
+async def test_set_if_shift_round_trip():
+    fs = FakeSerial()
+    fs.on(b"IS0;", b"IS00+1000;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_if_shift_hz(1000)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.if_shift_hz == 1000
+    await radio.stop()
+
+
+async def test_set_if_shift_invalid_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(ValueError):
+        await radio.set_if_shift_hz(15)
+    assert fs.writes == []
+    await radio.stop()
+
+
+async def test_set_filter_width_round_trip():
+    fs = FakeSerial()
+    fs.on(b"SH0;", b"SH0010;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_filter_width(10)
+    await asyncio.sleep(0.05)
+    assert radio.state.rx.filter_width_index == 10
+    await radio.stop()
+
+
+async def test_set_filter_width_invalid_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(ValueError):
+        await radio.set_filter_width(24)
+    assert fs.writes == []
+    await radio.stop()
