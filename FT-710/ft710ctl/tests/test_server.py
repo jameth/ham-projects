@@ -36,3 +36,14 @@ def test_api_state_serializes_enums_as_names():
     client = TestClient(app)
     body = client.get("/api/state").json()
     assert body["scope"]["mode"] == "WF_CENTER_NORMAL"
+
+
+def test_ws_initial_state():
+    radio = _stub_radio()
+    app = create_app(radio=radio)
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws:
+        first = ws.receive_json()
+        assert first["op"] == "snapshot"
+        assert "state" in first
+        assert "scope" in first["state"]

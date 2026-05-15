@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
 from .radio.state import to_jsonable
@@ -29,6 +29,21 @@ def create_app(radio=None) -> FastAPI:
         if radio is None:
             raise HTTPException(status_code=503, detail="radio not initialized")
         return to_jsonable(radio.state)
+
+    @app.websocket("/ws")
+    async def ws(websocket: WebSocket) -> None:
+        await websocket.accept()
+        if radio is None:
+            await websocket.send_json({"op": "error", "reason": "radio not initialized"})
+            await websocket.close()
+            return
+        await websocket.send_json({"op": "snapshot", "state": to_jsonable(radio.state)})
+        try:
+            while True:
+                # Phase 4 follow-up tasks fill in set / patch / port handling.
+                await websocket.receive_text()
+        except WebSocketDisconnect:
+            return
 
     app.mount("/", StaticFiles(directory=str(_WEB_DIR), html=True), name="web")
     return app
