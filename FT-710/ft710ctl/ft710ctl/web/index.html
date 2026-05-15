@@ -1,11 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>ft710ctl</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ft710ctl</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<h1>ft710ctl</h1>
-<p>Frontend placeholder — built in Phase 5.</p>
+  <header>
+    <h1>ft710ctl</h1>
+    <div id="port-banner" class="banner banner--connecting" data-state="connecting">
+      <span class="banner__dot"></span>
+      <span class="banner__label">connecting…</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel" id="scope-panel">
+      <h2>Scope</h2>
+      <div class="panel__placeholder">populated in Task 36</div>
+    </section>
+
+    <section class="panel" id="tuning-panel">
+      <h2>Tuning</h2>
+      <div class="panel__placeholder">populated in Task 37</div>
+    </section>
+
+    <section class="panel" id="rx-panel">
+      <h2>RX DSP</h2>
+      <div class="panel__placeholder">populated in Task 38</div>
+    </section>
+
+    <section class="panel panel--meters" id="meters-panel">
+      <h2>Meters</h2>
+      <div class="panel__placeholder">populated in Task 39</div>
+    </section>
+  </main>
+
+  <footer>
+    <details>
+      <summary>Live state (debug)</summary>
+      <pre id="state-dump"></pre>
+    </details>
+  </footer>
+
+  <script src="app.js"></script>
 </body>
 </html>

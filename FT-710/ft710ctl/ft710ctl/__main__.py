@@ -11,6 +11,29 @@ from .radio.commands import Radio
 from .server import create_app
 
 
+class _DeadFakeSerial:
+    """SerialLike that never produces frames. Used by --no-radio for frontend dev."""
+
+    def __init__(self):
+        self._inbound: asyncio.Queue[bytes] = asyncio.Queue()
+        self.is_open = True
+
+    async def write(self, data: bytes) -> None:
+        # Drop writes silently; no answers will arrive.
+        return
+
+    async def read_frame(self) -> bytes:
+        # Block forever; nothing is coming.
+        return await self._inbound.get()
+
+    def close(self) -> None:
+        self.is_open = False
+
+
+def _make_dead_factory():
+    return _DeadFakeSerial
+
+
 def _make_serial_factory(device: str, baud: int):
     """Build a SerialLike factory backed by pyserial-asyncio."""
     import serial_asyncio  # imported lazily so unit tests don't need it
@@ -68,25 +91,32 @@ def _make_serial_factory(device: str, baud: int):
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="ft710ctl")
-    parser.add_argument("--port", required=True, help="serial device, e.g. /dev/ttyUSB0")
+    parser.add_argument(
+        "--port",
+        help="serial device, e.g. /dev/ttyUSB0 (required unless --no-radio)",
+    )
     parser.add_argument("--baud", type=int, default=38400)
     parser.add_argument("--http-port", type=int, default=8710)
+    parser.add_argument(
+        "--no-radio",
+        action="store_true",
+        help="run with a stub serial that never replies (for frontend development)",
+    )
     args = parser.parse_args()
+
+    if not args.no_radio and not args.port:
+        parser.error("--port is required (or pass --no-radio for frontend dev)")
 
     logging.basicConfig(level=logging.INFO)
 
-    factory = _make_serial_factory(args.port, args.baud)
+    factory = _make_dead_factory() if args.no_radio else _make_serial_factory(args.port, args.baud)
     radio = Radio(factory=factory)
-    app = create_app(radio=radio)
+    app = create_app(radio=radio, manage_radio_lifecycle=True)
 
-    @app.on_event("startup")
-    async def _on_startup():
-        await radio.start()
-        await radio.snapshot()
-
-    @app.on_event("shutdown")
-    async def _on_shutdown():
-        await radio.stop()
+    if not args.no_radio:
+        @app.on_event("startup")
+        async def _initial_snapshot():
+            await radio.snapshot()
 
     uvicorn.run(app, host="127.0.0.1", port=args.http_port, log_level="info")
 
