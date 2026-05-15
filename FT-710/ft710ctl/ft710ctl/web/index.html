@@ -336,7 +336,32 @@
 
     <section class="panel panel--meters" id="meters-panel">
       <h2>Meters</h2>
-      <div class="panel__placeholder">populated in Task 39</div>
+
+      <div class="field">
+        <label>S-meter</label>
+        <div>
+          <div class="meter-bar"><div class="meter-bar__fill" id="meters-smeter-fill"></div></div>
+          <span id="meters-smeter-display">—</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="meters-af-gain">AF gain</label>
+        <input
+          type="range" id="meters-af-gain"
+          min="0" max="255" step="1" value="0"
+          data-field="meters.af_gain"
+        />
+      </div>
+
+      <div class="field">
+        <label for="meters-rf-gain">RF gain</label>
+        <input
+          type="range" id="meters-rf-gain"
+          min="0" max="255" step="1" value="0"
+          data-field="meters.rf_gain"
+        />
+      </div>
     </section>
   </main>
 

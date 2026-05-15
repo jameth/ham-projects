@@ -290,6 +290,22 @@ function renderScopeRefDisplay() {
   }
 }
 
+// Meters: render the S-meter bar from meters.smeter_raw (0..255).
+function renderSmeter() {
+  const fill = document.getElementById("meters-smeter-fill");
+  const display = document.getElementById("meters-smeter-display");
+  const raw = state.meters.smeter_raw;
+  if (fill) {
+    const pct = raw == null ? 0 : Math.min(100, Math.max(0, (raw / 255) * 100));
+    fill.style.width = `${pct.toFixed(1)}%`;
+  }
+  if (display) {
+    display.textContent = raw == null ? "—" : String(raw);
+  }
+}
+
+registerRenderer(renderSmeter);
+
 registerRenderer(renderDataFieldElements);
 registerRenderer(renderScopeRefDisplay);
 
