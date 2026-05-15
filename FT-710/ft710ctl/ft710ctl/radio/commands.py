@@ -15,15 +15,26 @@ from .port import PortClosed, RadioPort
 
 
 UNKNOWN_RING_SIZE = 100
+DEFAULT_RECONNECT_S = 2.0
 
 
 class Radio:
-    def __init__(self, factory, write_gap_s: float | None = None):
-        kwargs = {"write_gap_s": write_gap_s} if write_gap_s is not None else {}
-        self.port = RadioPort(factory=factory, **kwargs)
+    def __init__(
+        self,
+        factory,
+        write_gap_s: float | None = None,
+        reconnect_s: float = DEFAULT_RECONNECT_S,
+    ):
+        port_kwargs: dict = {"on_fault": self._on_port_fault}
+        if write_gap_s is not None:
+            port_kwargs["write_gap_s"] = write_gap_s
+        self.port = RadioPort(factory=factory, **port_kwargs)
         self.state = state.RadioState()
         self._consumer: asyncio.Task | None = None
         self._subscribers: list[Callable[[dict], None]] = []
+        self._reconnect_s = reconnect_s
+        self._reconnect_task: asyncio.Task | None = None
+        self._stopping = False
         # Quiescence accounting (Task 30): incremented when a read-back is
         # enqueued, decremented when the consumer applies a non-None update.
         # /api/raw uses this to wait until no expected answers are in flight.
@@ -44,11 +55,21 @@ class Radio:
         await self.port.send(frame)
 
     async def start(self) -> None:
+        self._stopping = False
         await self.port.open()
         self._consumer = asyncio.create_task(self._consume_frames())
         self._set_port_state("connected")
 
     async def stop(self) -> None:
+        self._stopping = True
+        # Cancel any in-flight reconnect attempt first so it doesn't fight us.
+        if self._reconnect_task is not None and not self._reconnect_task.done():
+            self._reconnect_task.cancel()
+            try:
+                await self._reconnect_task
+            except asyncio.CancelledError:
+                pass
+        self._reconnect_task = None
         self._set_port_state("disconnected")
         if self._consumer is not None:
             self._consumer.cancel()
@@ -56,6 +77,7 @@ class Radio:
                 await self._consumer
             except asyncio.CancelledError:
                 pass
+        self._consumer = None
         await self.port.close()
 
     # ---------- port state listeners ----------
@@ -273,6 +295,45 @@ class Radio:
         """Read every v1-tracked field once. Sequenced by the writer's gap."""
         for frame in _SNAPSHOT_READS:
             await self._enqueue_read(frame)
+
+    # ---------- reconnect (Task 41) ----------
+
+    def _on_port_fault(self, exc: Exception) -> None:
+        """Called from RadioPort's writer/reader task when the serial dies."""
+        if self._stopping:
+            return
+        if self._reconnect_task is not None and not self._reconnect_task.done():
+            return  # already reconnecting
+        self._set_port_state("disconnected")
+        self._reconnect_task = asyncio.create_task(self._reconnect_loop())
+
+    async def _reconnect_loop(self) -> None:
+        """Retry port.reopen() until it succeeds; refresh state via snapshot."""
+        while not self._stopping:
+            try:
+                await asyncio.sleep(self._reconnect_s)
+                if self._stopping:
+                    return
+                # Tear down the old machinery (idempotent if already down).
+                await self.port.close()
+                if self._consumer is not None and not self._consumer.done():
+                    self._consumer.cancel()
+                    try:
+                        await self._consumer
+                    except asyncio.CancelledError:
+                        pass
+                # Bring the port back up.
+                await self.port.open()
+                self._consumer = asyncio.create_task(self._consume_frames())
+                # Refresh state.
+                await self.snapshot()
+                self._set_port_state("connected")
+                return
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # Reopen / snapshot failed; try again on next iteration.
+                continue
 
     async def _wait_quiescence(self, timeout: float) -> None:
         """Poll until outstanding_reads drops to 0, or timeout elapses."""

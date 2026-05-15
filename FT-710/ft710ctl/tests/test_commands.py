@@ -31,8 +31,10 @@ async def test_stop_awaits_consumer_cleanup():
     fs = FakeSerial()
     radio = Radio(factory=lambda: fs, write_gap_s=0)
     await radio.start()
+    consumer = radio._consumer  # capture before stop() nulls it
     await radio.stop()
-    assert radio._consumer.done()
+    assert consumer.done()
+    assert radio._consumer is None
 
 
 # ---------- SS sub-function verbs (scope panel) ----------
@@ -800,6 +802,89 @@ async def test_unknown_ring_caps_at_max_size():
     await asyncio.sleep(0.1)
     assert len(radio.unknown_frames) == UNKNOWN_RING_SIZE
     await radio.stop()
+
+
+# ---------- reconnect ----------
+
+
+async def test_reconnect_after_write_fault():
+    """Writer fault → port_state disconnected → reopen → snapshot → connected."""
+    fs_broken = FakeSerial()
+    fs_broken.raise_on_next_write = IOError("simulated unplug")
+    fs_fresh = FakeSerial()
+    serials = iter([fs_broken, fs_fresh])
+    radio = Radio(
+        factory=lambda: next(serials),
+        write_gap_s=0,
+        reconnect_s=0.02,
+    )
+    transitions: list[str] = []
+    radio.add_port_listener(transitions.append)
+    await radio.start()
+    assert radio.port_state == "connected"
+
+    # Trigger the writer fault by enqueuing a frame.
+    await radio.port.send(b"FA;")
+    # Let the fault propagate + reconnect cycle run.
+    await asyncio.sleep(0.2)
+
+    assert radio.port_state == "connected"
+    # Snapshot ran on the fresh serial after reopen.
+    assert b"SS05;" in fs_fresh.writes, "reconnect should have snapshotted on fs_fresh"
+    # Full transition record (before stop): connected → disconnected → connected.
+    assert transitions == ["connected", "disconnected", "connected"]
+
+    await radio.stop()
+    # stop appends one final disconnected transition.
+    assert transitions[-1] == "disconnected"
+
+
+async def test_reconnect_loop_keeps_retrying_until_reopen_succeeds():
+    """If reopen() fails the first time, the loop tries again."""
+    fs_broken = FakeSerial()
+    fs_broken.raise_on_next_write = IOError("simulated unplug")
+    fs_fresh = FakeSerial()
+    attempts: list[int] = []
+
+    def factory():
+        attempts.append(1)
+        # First call (start): broken serial.
+        # Second call (first reopen): a serial that immediately fails open.
+        # Third call (second reopen): fresh working serial.
+        if len(attempts) == 1:
+            return fs_broken
+        if len(attempts) == 2:
+            failing = FakeSerial()
+            failing.raise_on_next_write = IOError("still unplugged")
+            return failing
+        return fs_fresh
+
+    radio = Radio(factory=factory, write_gap_s=0, reconnect_s=0.02)
+    await radio.start()
+    await radio.port.send(b"FA;")  # trigger first fault
+    await asyncio.sleep(0.5)  # allow multiple reconnect iterations
+
+    assert radio.port_state == "connected"
+    assert len(attempts) >= 3
+    await radio.stop()
+
+
+async def test_stop_during_reconnect_cleans_up():
+    fs_broken = FakeSerial()
+    fs_broken.raise_on_next_write = IOError("simulated unplug")
+
+    def factory():
+        return fs_broken  # always returns the broken one
+
+    radio = Radio(factory=factory, write_gap_s=0, reconnect_s=10.0)  # long retry
+    await radio.start()
+    await radio.port.send(b"FA;")
+    await asyncio.sleep(0.05)
+    assert radio.port_state == "disconnected"
+    assert radio._reconnect_task is not None
+    # Calling stop while the reconnect loop is parked in sleep must cancel it.
+    await radio.stop()
+    assert radio._reconnect_task is None
 
 
 # ---------- outstanding_reads accounting ----------

@@ -27,9 +27,11 @@ class RadioPort:
         self,
         factory: Callable[[], SerialLike],
         write_gap_s: float = WRITE_GAP_S,
+        on_fault: Callable[[Exception], None] | None = None,
     ):
         self._factory = factory
         self._write_gap_s = write_gap_s
+        self._on_fault = on_fault
         self._serial: SerialLike | None = None
         self._outbound: asyncio.Queue[bytes] = asyncio.Queue()
         self._inbound: asyncio.Queue = asyncio.Queue()
@@ -86,14 +88,26 @@ class RadioPort:
 
     async def _writer(self) -> None:
         assert self._serial is not None
-        while True:
-            frame = await self._outbound.get()
-            await self._serial.write(frame)
-            if self._write_gap_s > 0:
-                await asyncio.sleep(self._write_gap_s)
+        try:
+            while True:
+                frame = await self._outbound.get()
+                await self._serial.write(frame)
+                if self._write_gap_s > 0:
+                    await asyncio.sleep(self._write_gap_s)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if self._on_fault is not None:
+                self._on_fault(exc)
 
     async def _reader(self) -> None:
         assert self._serial is not None
-        while True:
-            frame = await self._serial.read_frame()
-            await self._inbound.put(frame)
+        try:
+            while True:
+                frame = await self._serial.read_frame()
+                await self._inbound.put(frame)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if self._on_fault is not None:
+                self._on_fault(exc)
