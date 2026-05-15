@@ -773,3 +773,52 @@ async def test_state_change_publishes_to_subscriber():
     await asyncio.sleep(0.05)
     assert received == [{"field": "scope.span_khz", "value": 100}]
     await radio.stop()
+
+
+# ---------- outstanding_reads accounting ----------
+
+
+async def test_set_increments_outstanding_reads():
+    fs = FakeSerial()  # no canned response → answer never arrives
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_span_khz(100)
+    await asyncio.sleep(0.05)
+    # Set wrote (SS0560000;) then enqueued read (SS05;).
+    # No reply, so outstanding_reads stays at 1.
+    assert radio._outstanding_reads == 1
+    await radio.stop()
+
+
+async def test_consumed_answer_decrements_outstanding_reads():
+    fs = FakeSerial()
+    fs.on(b"SS05;", b"SS0560000;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_span_khz(100)
+    await asyncio.sleep(0.05)
+    # Read was enqueued (+1), Answer was consumed (-1) → 0
+    assert radio._outstanding_reads == 0
+    await radio.stop()
+
+
+async def test_band_setter_does_not_change_outstanding_reads():
+    # BS has no Read form, so set_band must not bump the counter.
+    from ft710ctl.radio import protocol
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_band(protocol.Band.M20)
+    await asyncio.sleep(0.05)
+    assert radio._outstanding_reads == 0
+    await radio.stop()
+
+
+async def test_unsolicited_frame_does_not_underflow_outstanding_reads():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await fs.push(b"SS0560000;")  # no set was issued; not waiting for it
+    await asyncio.sleep(0.05)
+    assert radio._outstanding_reads == 0
+    await radio.stop()

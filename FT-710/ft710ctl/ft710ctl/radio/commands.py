@@ -19,6 +19,14 @@ class Radio:
         self.state = state.RadioState()
         self._consumer: asyncio.Task | None = None
         self._subscribers: list[Callable[[dict], None]] = []
+        # Quiescence accounting (Task 30): incremented when a read-back is
+        # enqueued, decremented when the consumer applies a non-None update.
+        # /api/raw uses this to wait until no expected answers are in flight.
+        self._outstanding_reads: int = 0
+
+    async def _enqueue_read(self, frame: bytes) -> None:
+        self._outstanding_reads += 1
+        await self.port.send(frame)
 
     async def start(self) -> None:
         await self.port.open()
@@ -45,6 +53,8 @@ class Radio:
             update = protocol.decode(frame)
             delta = self.state.apply(update)
             if delta is not None:
+                if self._outstanding_reads > 0:
+                    self._outstanding_reads -= 1
                 for cb in list(self._subscribers):
                     try:
                         cb(delta)
@@ -52,38 +62,35 @@ class Radio:
                         pass
 
     async def set_span_khz(self, khz: int) -> None:
-        frame = protocol.encode_set_span_khz(khz)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_span())
+        await self.port.send(protocol.encode_set_span_khz(khz))
+        await self._enqueue_read(protocol.encode_read_span())
 
     async def set_ref_level_db(self, db: float) -> None:
-        frame = protocol.encode_set_ref_level_db(db)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_ref_level())
+        await self.port.send(protocol.encode_set_ref_level_db(db))
+        await self._enqueue_read(protocol.encode_read_ref_level())
 
     async def set_scope_mode(self, mode: protocol.ScopeMode) -> None:
         _require_enum(mode, protocol.ScopeMode)
         await self.port.send(protocol.encode_set_scope_mode(mode))
-        await self.port.send(protocol.encode_read_scope_mode())
+        await self._enqueue_read(protocol.encode_read_scope_mode())
 
     async def set_scope_speed(self, speed: protocol.ScopeSpeed) -> None:
         _require_enum(speed, protocol.ScopeSpeed)
         await self.port.send(protocol.encode_set_scope_speed(speed))
-        await self.port.send(b"SS00;")
+        await self._enqueue_read(b"SS00;")
 
     async def set_scope_peak(self, peak: protocol.ScopePeak) -> None:
         _require_enum(peak, protocol.ScopePeak)
         await self.port.send(protocol.encode_set_scope_peak(peak))
-        await self.port.send(b"SS01;")
+        await self._enqueue_read(b"SS01;")
 
     async def set_scope_marker(self, enabled: bool) -> None:
         await self.port.send(protocol.encode_set_scope_marker(enabled))
-        await self.port.send(b"SS02;")
+        await self._enqueue_read(b"SS02;")
 
     async def set_scope_color(self, color: int) -> None:
-        frame = protocol.encode_set_scope_color(color)
-        await self.port.send(frame)
-        await self.port.send(b"SS03;")
+        await self.port.send(protocol.encode_set_scope_color(color))
+        await self._enqueue_read(b"SS03;")
 
     async def set_af_fft_mode(
         self, mode: protocol.AfFftMode, osc_time_index: int = 0
@@ -92,22 +99,20 @@ class Radio:
         await self.port.send(
             protocol.encode_set_af_fft_mode(mode, osc_time_index=osc_time_index)
         )
-        await self.port.send(protocol.encode_read_af_fft())
+        await self._enqueue_read(protocol.encode_read_af_fft())
 
     async def set_vfo_a_hz(self, hz: int) -> None:
-        frame = protocol.encode_set_vfo_a_hz(hz)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_vfo_a())
+        await self.port.send(protocol.encode_set_vfo_a_hz(hz))
+        await self._enqueue_read(protocol.encode_read_vfo_a())
 
     async def set_vfo_b_hz(self, hz: int) -> None:
-        frame = protocol.encode_set_vfo_b_hz(hz)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_vfo_b())
+        await self.port.send(protocol.encode_set_vfo_b_hz(hz))
+        await self._enqueue_read(protocol.encode_read_vfo_b())
 
     async def set_mode(self, mode: protocol.OperatingMode) -> None:
         _require_enum(mode, protocol.OperatingMode)
         await self.port.send(protocol.encode_set_mode(mode))
-        await self.port.send(protocol.encode_read_mode())
+        await self._enqueue_read(protocol.encode_read_mode())
 
     async def set_band(self, band: protocol.Band) -> None:
         _require_enum(band, protocol.Band)
@@ -121,104 +126,95 @@ class Radio:
 
     async def set_split(self, enabled: bool) -> None:
         await self.port.send(protocol.encode_set_split(enabled))
-        await self.port.send(protocol.encode_read_split())
+        await self._enqueue_read(protocol.encode_read_split())
 
     # ---------- RX DSP ----------
 
     async def set_preamp(self, setting: protocol.Preamp) -> None:
         _require_enum(setting, protocol.Preamp)
         await self.port.send(protocol.encode_set_preamp(setting))
-        await self.port.send(protocol.encode_read_preamp())
+        await self._enqueue_read(protocol.encode_read_preamp())
 
     async def set_attenuator(self, setting: protocol.Attenuator) -> None:
         _require_enum(setting, protocol.Attenuator)
         await self.port.send(protocol.encode_set_attenuator(setting))
-        await self.port.send(protocol.encode_read_attenuator())
+        await self._enqueue_read(protocol.encode_read_attenuator())
 
     async def set_agc(self, setting: protocol.AgcSet) -> None:
         _require_enum(setting, protocol.AgcSet)
         await self.port.send(protocol.encode_set_agc(setting))
-        await self.port.send(protocol.encode_read_agc())
+        await self._enqueue_read(protocol.encode_read_agc())
 
     async def set_nb(self, enabled: bool) -> None:
         await self.port.send(protocol.encode_set_nb(enabled))
-        await self.port.send(protocol.encode_read_nb())
+        await self._enqueue_read(protocol.encode_read_nb())
 
     async def set_nb_level(self, level: int) -> None:
-        frame = protocol.encode_set_nb_level(level)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_nb_level())
+        await self.port.send(protocol.encode_set_nb_level(level))
+        await self._enqueue_read(protocol.encode_read_nb_level())
 
     async def set_nr(self, enabled: bool) -> None:
         await self.port.send(protocol.encode_set_nr(enabled))
-        await self.port.send(protocol.encode_read_nr())
+        await self._enqueue_read(protocol.encode_read_nr())
 
     async def set_nr_level(self, level: int) -> None:
-        frame = protocol.encode_set_nr_level(level)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_nr_level())
+        await self.port.send(protocol.encode_set_nr_level(level))
+        await self._enqueue_read(protocol.encode_read_nr_level())
 
     async def set_manual_notch(self, enabled: bool) -> None:
         await self.port.send(protocol.encode_set_manual_notch(enabled))
-        await self.port.send(protocol.encode_read_manual_notch_state())
+        await self._enqueue_read(protocol.encode_read_manual_notch_state())
 
     async def set_manual_notch_freq_hz(self, freq_hz: int) -> None:
-        frame = protocol.encode_set_manual_notch_freq_hz(freq_hz)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_manual_notch_freq())
+        await self.port.send(protocol.encode_set_manual_notch_freq_hz(freq_hz))
+        await self._enqueue_read(protocol.encode_read_manual_notch_freq())
 
     async def set_auto_notch(self, enabled: bool) -> None:
         await self.port.send(protocol.encode_set_auto_notch(enabled))
-        await self.port.send(protocol.encode_read_auto_notch())
+        await self._enqueue_read(protocol.encode_read_auto_notch())
 
     async def set_contour(self, enabled: bool) -> None:
         await self.port.send(protocol.encode_set_contour(enabled))
-        await self.port.send(protocol.encode_read_contour_state())
+        await self._enqueue_read(protocol.encode_read_contour_state())
 
     async def set_contour_freq_hz(self, freq_hz: int) -> None:
-        frame = protocol.encode_set_contour_freq_hz(freq_hz)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_contour_freq())
+        await self.port.send(protocol.encode_set_contour_freq_hz(freq_hz))
+        await self._enqueue_read(protocol.encode_read_contour_freq())
 
     async def set_apf(self, enabled: bool) -> None:
         await self.port.send(protocol.encode_set_apf(enabled))
-        await self.port.send(protocol.encode_read_apf_state())
+        await self._enqueue_read(protocol.encode_read_apf_state())
 
     async def set_apf_freq_hz(self, freq_hz: int) -> None:
-        frame = protocol.encode_set_apf_freq_hz(freq_hz)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_apf_freq())
+        await self.port.send(protocol.encode_set_apf_freq_hz(freq_hz))
+        await self._enqueue_read(protocol.encode_read_apf_freq())
 
     async def set_if_shift_hz(self, shift_hz: int) -> None:
-        frame = protocol.encode_set_if_shift_hz(shift_hz)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_if_shift())
+        await self.port.send(protocol.encode_set_if_shift_hz(shift_hz))
+        await self._enqueue_read(protocol.encode_read_if_shift())
 
     async def set_filter_width(self, index: int) -> None:
-        frame = protocol.encode_set_filter_width(index)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_filter_width())
+        await self.port.send(protocol.encode_set_filter_width(index))
+        await self._enqueue_read(protocol.encode_read_filter_width())
 
     # ---------- AF / RF gain + CLAR ----------
 
     async def set_af_gain(self, value: int) -> None:
-        frame = protocol.encode_set_af_gain(value)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_af_gain())
+        await self.port.send(protocol.encode_set_af_gain(value))
+        await self._enqueue_read(protocol.encode_read_af_gain())
 
     async def set_rf_gain(self, value: int) -> None:
-        frame = protocol.encode_set_rf_gain(value)
-        await self.port.send(frame)
-        await self.port.send(protocol.encode_read_rf_gain())
+        await self.port.send(protocol.encode_set_rf_gain(value))
+        await self._enqueue_read(protocol.encode_read_rf_gain())
 
     async def set_rx_clar(self, enabled: bool) -> None:
         await self.port.send(protocol.encode_set_rx_clar(enabled))
-        await self.port.send(protocol.encode_read_clar())
+        await self._enqueue_read(protocol.encode_read_clar())
 
     async def snapshot(self) -> None:
         """Read every v1-tracked field once. Sequenced by the writer's gap."""
         for frame in _SNAPSHOT_READS:
-            await self.port.send(frame)
+            await self._enqueue_read(frame)
 
 
 _SNAPSHOT_READS: tuple[bytes, ...] = (
