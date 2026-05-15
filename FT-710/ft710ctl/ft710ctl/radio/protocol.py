@@ -223,6 +223,26 @@ class RfGainUpdate:
     value: int
 
 
+class Band(Enum):
+    M160 = "00"
+    M80 = "01"
+    M60 = "02"
+    M40 = "03"
+    M30 = "04"
+    M20 = "05"
+    M17 = "06"
+    M15 = "07"
+    M12 = "08"
+    M10 = "09"
+    M6 = "10"
+    GEN = "11"
+
+
+@dataclass(frozen=True)
+class SplitUpdate:
+    enabled: bool
+
+
 RadioUpdate = Union[
     "ScopeSpanUpdate",
     "ScopeRefLevelUpdate",
@@ -248,6 +268,7 @@ RadioUpdate = Union[
     "SmeterUpdate",
     "AfGainUpdate",
     "RfGainUpdate",
+    "SplitUpdate",
     "UnknownFrame",
 ]
 
@@ -526,6 +547,22 @@ def encode_read_rf_gain() -> bytes:
     return b"RG0;"
 
 
+def encode_set_band(band: Band) -> bytes:
+    return f"BS{band.value};".encode("ascii")
+
+
+def encode_swap_vfo() -> bytes:
+    return b"SV;"
+
+
+def encode_set_split(enabled: bool) -> bytes:
+    return b"ST1;" if enabled else b"ST0;"
+
+
+def encode_read_split() -> bytes:
+    return b"ST;"
+
+
 def _parse_vfo(frame: bytes) -> "VfoFreqUpdate | None":
     if len(frame) != 12 or frame[-1:] != b";":
         return None
@@ -649,4 +686,6 @@ def decode(frame: bytes) -> RadioUpdate:
         v = int(frame[3:6])
         if 0 <= v <= 255:
             return RfGainUpdate(value=v)
+    if len(frame) == 4 and frame[:2] == b"ST" and frame[-1:] == b";" and frame[2:3] in (b"0", b"1"):
+        return SplitUpdate(enabled=(frame[2:3] == b"1"))
     return UnknownFrame(raw=frame)

@@ -506,3 +506,37 @@ def test_encode_set_rf_gain():
 
 def test_encode_read_rf_gain():
     assert protocol.encode_read_rf_gain() == b"RG0;"
+
+
+BAND_CASES = [
+    ("M160", "00"), ("M80", "01"), ("M60", "02"), ("M40", "03"),
+    ("M30", "04"), ("M20", "05"), ("M17", "06"), ("M15", "07"),
+    ("M12", "08"), ("M10", "09"), ("M6", "10"), ("GEN", "11"),
+]
+
+
+@pytest.mark.parametrize("name,digits", BAND_CASES)
+def test_encode_set_band(name, digits):
+    band = protocol.Band[name]
+    assert protocol.encode_set_band(band) == f"BS{digits};".encode("ascii")
+
+
+def test_encode_swap_vfo():
+    assert protocol.encode_swap_vfo() == b"SV;"
+
+
+def test_encode_set_split_on():
+    assert protocol.encode_set_split(True) == b"ST1;"
+
+
+def test_encode_set_split_off():
+    assert protocol.encode_set_split(False) == b"ST0;"
+
+
+def test_encode_read_split():
+    assert protocol.encode_read_split() == b"ST;"
+
+
+def test_decode_split():
+    assert protocol.decode(b"ST1;") == protocol.SplitUpdate(enabled=True)
+    assert protocol.decode(b"ST0;") == protocol.SplitUpdate(enabled=False)
