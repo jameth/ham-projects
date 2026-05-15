@@ -505,6 +505,26 @@ def test_encode_read_af_fft():
     assert protocol.encode_read_af_fft() == b"SS07;"
 
 
+@pytest.mark.parametrize("name,digit", AF_FFT_CASES)
+def test_decode_af_fft(name, digit):
+    mode = protocol.AfFftMode[name]
+    frame = f"SS07{digit}0000;".encode("ascii")
+    assert protocol.decode(frame) == protocol.AfFftUpdate(mode=mode, osc_time_index=0)
+
+
+def test_decode_af_fft_with_osc_time():
+    # Round-trip OSC_0DB with osc_time_index=3 confirms the 2-byte field.
+    assert protocol.decode(b"SS0730300;") == protocol.AfFftUpdate(
+        mode=protocol.AfFftMode.OSC_0DB, osc_time_index=3
+    )
+
+
+def test_decode_af_fft_rejects_old_11_byte_form():
+    # The pre-fix encoder produced 11-byte frames; they must fall through.
+    raw = b"SS07000000;"
+    assert protocol.decode(raw) == protocol.UnknownFrame(raw=raw)
+
+
 def test_encode_read_smeter():
     assert protocol.encode_read_smeter() == b"SM0;"
 

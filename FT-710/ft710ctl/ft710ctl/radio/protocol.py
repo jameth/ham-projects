@@ -229,6 +229,12 @@ class AfFftMode(Enum):
 
 
 @dataclass(frozen=True)
+class AfFftUpdate:
+    mode: "AfFftMode"
+    osc_time_index: int  # 0..5 → 1, 3, 10, 30, 100, 300 ms
+
+
+@dataclass(frozen=True)
 class SmeterUpdate:
     raw: int
 
@@ -300,6 +306,7 @@ RadioUpdate = Union[
     "ScopePeakUpdate",
     "ScopeMarkerUpdate",
     "ScopeColorUpdate",
+    "AfFftUpdate",
     "UnknownFrame",
 ]
 
@@ -656,6 +663,21 @@ def decode(frame: bytes) -> RadioUpdate:
             return ScopeMarkerUpdate(enabled=(digit == "1"))
         if sub == b"03" and digit in "0123456789A":
             return ScopeColorUpdate(color="0123456789A".index(digit) + 1)
+    if (
+        len(frame) == 10
+        and frame[:4] == b"SS07"
+        and frame[-1:] == b";"
+        and frame[7:9] == b"00"
+        and frame[5:7].isdigit()
+    ):
+        try:
+            mode = AfFftMode(chr(frame[4]))
+        except ValueError:
+            pass
+        else:
+            osc = int(frame[5:7])
+            if 0 <= osc <= 5:
+                return AfFftUpdate(mode=mode, osc_time_index=osc)
     if len(frame) == 10 and frame[:4] == b"SS05" and frame[-1:] == b";":
         digit = chr(frame[4])
         if digit in _SPAN_KHZ_BY_DIGIT and frame[5:9] == b"0000":
