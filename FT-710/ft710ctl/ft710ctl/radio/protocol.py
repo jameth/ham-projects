@@ -214,6 +214,11 @@ class ScopeMarkerUpdate:
     enabled: bool
 
 
+@dataclass(frozen=True)
+class ScopeColorUpdate:
+    color: int  # 1..11
+
+
 class AfFftMode(Enum):
     AF_FFT_0DB = "0"
     AF_FFT_10DB = "1"
@@ -294,6 +299,7 @@ RadioUpdate = Union[
     "ScopeSpeedUpdate",
     "ScopePeakUpdate",
     "ScopeMarkerUpdate",
+    "ScopeColorUpdate",
     "UnknownFrame",
 ]
 
@@ -643,6 +649,8 @@ def decode(frame: bytes) -> RadioUpdate:
                 pass
         if sub == b"02" and digit in ("0", "1"):
             return ScopeMarkerUpdate(enabled=(digit == "1"))
+        if sub == b"03" and digit in "0123456789A":
+            return ScopeColorUpdate(color="0123456789A".index(digit) + 1)
     if len(frame) == 10 and frame[:4] == b"SS05" and frame[-1:] == b";":
         digit = chr(frame[4])
         if digit in _SPAN_KHZ_BY_DIGIT and frame[5:9] == b"0000":

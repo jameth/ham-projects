@@ -463,6 +463,12 @@ def test_encode_set_scope_color(color, digit):
     assert protocol.encode_set_scope_color(color) == f"SS03{digit}0000;".encode("ascii")
 
 
+@pytest.mark.parametrize("color,digit", SCOPE_COLOR_CASES)
+def test_decode_scope_color(color, digit):
+    frame = f"SS03{digit}0000;".encode("ascii")
+    assert protocol.decode(frame) == protocol.ScopeColorUpdate(color=color)
+
+
 def test_encode_set_scope_color_rejects_out_of_range():
     with pytest.raises(ValueError):
         protocol.encode_set_scope_color(12)
@@ -616,3 +622,5 @@ def test_decode_known_prefix_wrong_length():
     assert protocol.decode(b"SS0100001;") == protocol.UnknownFrame(raw=b"SS0100001;")
     # SS02 with P3 not 0/1 → unknown (digit "2" is not a valid marker state)
     assert protocol.decode(b"SS0220000;") == protocol.UnknownFrame(raw=b"SS0220000;")
+    # SS03 with P3 outside 0..9/A → unknown (digit "B" is past Color-11)
+    assert protocol.decode(b"SS03B0000;") == protocol.UnknownFrame(raw=b"SS03B0000;")
