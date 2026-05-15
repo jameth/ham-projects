@@ -6,10 +6,15 @@ Wires the protocol layer to the port and canonical state. Public verbs
 from __future__ import annotations
 
 import asyncio
+import time
+from collections import deque
 from typing import Callable
 
 from . import protocol, state
 from .port import PortClosed, RadioPort
+
+
+UNKNOWN_RING_SIZE = 100
 
 
 class Radio:
@@ -31,6 +36,8 @@ class Radio:
         # changes: "connected" / "disconnected".
         self.port_state: str = "disconnected"
         self._port_listeners: list[Callable[[str], None]] = []
+        # Ring buffer of unparseable frames for /api/debug/unknown.
+        self.unknown_frames: deque[dict] = deque(maxlen=UNKNOWN_RING_SIZE)
 
     async def _enqueue_read(self, frame: bytes) -> None:
         self._outstanding_reads += 1
@@ -97,6 +104,11 @@ class Radio:
                 self._captured_frame.set_result(frame)
                 continue
             update = protocol.decode(frame)
+            if isinstance(update, protocol.UnknownFrame):
+                self.unknown_frames.append({
+                    "ts": time.time(),
+                    "hex": frame.hex(),
+                })
             delta = self.state.apply(update)
             if delta is not None:
                 if self._outstanding_reads > 0:

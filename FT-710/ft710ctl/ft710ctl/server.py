@@ -116,6 +116,12 @@ def create_app(radio=None, manage_radio_lifecycle: bool = False) -> FastAPI:
             raise HTTPException(status_code=503, detail="radio not initialized")
         return to_jsonable(radio.state)
 
+    @app.get("/api/debug/unknown")
+    async def get_unknown_frames() -> dict:
+        if radio is None:
+            raise HTTPException(status_code=503, detail="radio not initialized")
+        return {"frames": list(radio.unknown_frames)}
+
     @app.post("/api/raw")
     async def post_raw(req: RawRequest) -> dict:
         if radio is None:

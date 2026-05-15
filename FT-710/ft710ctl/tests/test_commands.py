@@ -775,6 +775,33 @@ async def test_state_change_publishes_to_subscriber():
     await radio.stop()
 
 
+async def test_unknown_ring_records_unparseable_frames():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await fs.push(b"ZZ0;")
+    await fs.push(b"\xff\xfe;")
+    await asyncio.sleep(0.05)
+    assert len(radio.unknown_frames) == 2
+    assert radio.unknown_frames[0]["hex"] == b"ZZ0;".hex()
+    assert radio.unknown_frames[1]["hex"] == b"\xff\xfe;".hex()
+    await radio.stop()
+
+
+async def test_unknown_ring_caps_at_max_size():
+    from ft710ctl.radio.commands import UNKNOWN_RING_SIZE
+
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    # Push one more than the cap; oldest must be evicted.
+    for i in range(UNKNOWN_RING_SIZE + 1):
+        await fs.push(f"ZZ{i:03d};".encode("ascii"))
+    await asyncio.sleep(0.1)
+    assert len(radio.unknown_frames) == UNKNOWN_RING_SIZE
+    await radio.stop()
+
+
 # ---------- outstanding_reads accounting ----------
 
 

@@ -653,3 +653,28 @@ def test_decode_known_prefix_wrong_length():
     assert protocol.decode(b"SS0220000;") == protocol.UnknownFrame(raw=b"SS0220000;")
     # SS03 with P3 outside 0..9/A → unknown (digit "B" is past Color-11)
     assert protocol.decode(b"SS03B0000;") == protocol.UnknownFrame(raw=b"SS03B0000;")
+
+
+def test_decode_dispatcher_falls_through_for_every_known_prefix_with_bad_shape():
+    """Every prefix that has a known decoder branch must still return
+    UnknownFrame when the body doesn't match the manual's frame shape.
+    Guards against an `if` branch silently accepting malformed input."""
+    bad_frames = [
+        b"SS0500000",      # missing terminator
+        b"SS05;",          # too short (looks like a read frame, not an answer)
+        b"FA;",            # too short to be a frequency answer
+        b"FA12345678;",    # wrong digit count
+        b"MD;",            # missing P1+P2
+        b"GT;",            # missing P1+P2
+        b"BP00;",          # 5 bytes — looks like read, not answer
+        b"CO00;",          # 5 bytes — looks like read, not answer
+        b"IS00+;",         # missing 4-digit Hz
+        b"SH00;",          # missing P3
+        b"AG0;",           # missing 3-digit gain
+        b"SM0;",           # missing 3-digit S-meter value
+    ]
+    for frame in bad_frames:
+        result = protocol.decode(frame)
+        assert isinstance(result, protocol.UnknownFrame), (
+            f"decoder accepted malformed {frame!r}"
+        )

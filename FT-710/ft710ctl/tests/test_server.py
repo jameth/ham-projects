@@ -317,3 +317,20 @@ def test_ws_broadcasts_port_disconnected_on_state_change():
             # Simulate the port going down (Task 41 will plug in the real trigger).
             radio._set_port_state("disconnected")
             assert ws.receive_json() == {"op": "port", "state": "disconnected"}
+
+
+# ---------- /api/debug/unknown ----------
+
+
+def test_unknown_ring_exposed_at_endpoint():
+    radio = _stub_radio()
+    radio.unknown_frames = [
+        {"ts": 1.0, "hex": b"ZZ0;".hex()},
+        {"ts": 2.0, "hex": b"\xff\xfe;".hex()},
+    ]
+    app = create_app(radio=radio)
+    client = TestClient(app)
+    r = client.get("/api/debug/unknown")
+    assert r.status_code == 200
+    assert len(r.json()["frames"]) == 2
+    assert r.json()["frames"][0]["hex"] == b"ZZ0;".hex()
