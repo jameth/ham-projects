@@ -65,6 +65,14 @@ _SET_DISPATCH: dict[str, tuple[str, type | None]] = {
 }
 
 
+async def _send_safe(websocket: WebSocket, payload: dict) -> None:
+    """Send a JSON payload; swallow connection errors so dead sockets unhook cleanly."""
+    try:
+        await websocket.send_json(payload)
+    except Exception:
+        pass
+
+
 async def _dispatch_set(radio, field: str, value) -> None:
     entry = _SET_DISPATCH.get(field)
     if entry is None:
@@ -85,9 +93,18 @@ async def _dispatch_set(radio, field: str, value) -> None:
 _WEB_DIR = Path(__file__).parent / "web"
 
 
-def create_app(radio=None) -> FastAPI:
+def create_app(radio=None, manage_radio_lifecycle: bool = False) -> FastAPI:
     app = FastAPI(title="ft710ctl")
     app.state.radio = radio
+
+    if manage_radio_lifecycle and radio is not None:
+        @app.on_event("startup")
+        async def _radio_startup() -> None:
+            await radio.start()
+
+        @app.on_event("shutdown")
+        async def _radio_shutdown() -> None:
+            await radio.stop()
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -124,6 +141,19 @@ def create_app(radio=None) -> FastAPI:
             await websocket.close()
             return
         await websocket.send_json({"op": "snapshot", "state": to_jsonable(radio.state)})
+
+        loop = asyncio.get_event_loop()
+
+        def _on_delta(delta: dict) -> None:
+            # Fired from the consumer task. Schedule send on the same loop.
+            payload = {
+                "op": "patch",
+                "field": delta["field"],
+                "value": to_jsonable(delta["value"]),
+            }
+            loop.create_task(_send_safe(websocket, payload))
+
+        radio.subscribe(_on_delta)
         try:
             while True:
                 msg = await websocket.receive_json()
@@ -144,6 +174,8 @@ def create_app(radio=None) -> FastAPI:
                     )
         except WebSocketDisconnect:
             return
+        finally:
+            radio.unsubscribe(_on_delta)
 
     app.mount("/", StaticFiles(directory=str(_WEB_DIR), html=True), name="web")
     return app

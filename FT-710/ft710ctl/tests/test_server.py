@@ -7,7 +7,11 @@ from ft710ctl.server import create_app
 
 
 def _stub_radio() -> SimpleNamespace:
-    return SimpleNamespace(state=RadioState())
+    return SimpleNamespace(
+        state=RadioState(),
+        subscribe=lambda cb: None,
+        unsubscribe=lambda cb: None,
+    )
 
 
 def test_health():
@@ -138,6 +142,12 @@ class _StubRadio:
         self.state = RadioState()
         self.calls: list[tuple[str, tuple, dict]] = []
 
+    def subscribe(self, callback) -> None:
+        pass
+
+    def unsubscribe(self, callback) -> None:
+        pass
+
     def __getattr__(self, name):
         if name.startswith("set_") or name == "swap_vfo":
             async def _record(*args, **kwargs):
@@ -198,3 +208,66 @@ def test_ws_set_swap_vfo_ignores_value():
         ack = ws.receive_json()
     assert ack == {"op": "ack", "request_id": "rs"}
     assert radio.calls == [("swap_vfo", (), {})]
+
+
+# ---------- WebSocket delta broadcast ----------
+
+
+def _collect_messages(ws, count, timeout=2.0):
+    """Receive `count` JSON messages from a TestClient WS within `timeout`."""
+    import time
+    msgs = []
+    deadline = time.monotonic() + timeout
+    while len(msgs) < count and time.monotonic() < deadline:
+        msgs.append(ws.receive_json())
+    return msgs
+
+
+def test_ws_broadcasts_delta_after_set():
+    fs = FakeSerial()
+    fs.on(b"SS05;", b"SS0560000;")  # read-back to set_span_khz(100)
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    app = create_app(radio=radio, manage_radio_lifecycle=True)
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as ws:
+            ws.receive_json()  # snapshot
+            ws.send_json({
+                "op": "set", "field": "scope.span_khz",
+                "value": 100, "request_id": "r1",
+            })
+            msgs = _collect_messages(ws, 2)
+    ops = sorted(m["op"] for m in msgs)
+    assert ops == ["ack", "patch"]
+    patch = next(m for m in msgs if m["op"] == "patch")
+    assert patch == {"op": "patch", "field": "scope.span_khz", "value": 100}
+
+
+def test_ws_broadcasts_to_multiple_clients():
+    fs = FakeSerial()
+    fs.on(b"SS05;", b"SS0560000;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    app = create_app(radio=radio, manage_radio_lifecycle=True)
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as ws1, client.websocket_connect("/ws") as ws2:
+            ws1.receive_json()  # snapshot
+            ws2.receive_json()  # snapshot
+            ws1.send_json({
+                "op": "set", "field": "scope.span_khz",
+                "value": 100, "request_id": "r1",
+            })
+            ws1_msgs = _collect_messages(ws1, 2)
+            ws2_msgs = _collect_messages(ws2, 1)
+    p1 = next(m for m in ws1_msgs if m["op"] == "patch")
+    p2 = next(m for m in ws2_msgs if m["op"] == "patch")
+    assert p1 == p2 == {"op": "patch", "field": "scope.span_khz", "value": 100}
+
+
+def test_ws_disconnect_unsubscribes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    app = create_app(radio=radio, manage_radio_lifecycle=True)
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as ws:
+            ws.receive_json()
+        # After disconnect, subscriber list should be empty.
+        assert radio._subscribers == []

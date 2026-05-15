@@ -48,6 +48,12 @@ class Radio:
     def subscribe(self, callback: Callable[[dict], None]) -> None:
         self._subscribers.append(callback)
 
+    def unsubscribe(self, callback: Callable[[dict], None]) -> None:
+        try:
+            self._subscribers.remove(callback)
+        except ValueError:
+            pass
+
     async def _consume_frames(self) -> None:
         while True:
             try:
