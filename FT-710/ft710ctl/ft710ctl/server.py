@@ -141,6 +141,8 @@ def create_app(radio=None, manage_radio_lifecycle: bool = False) -> FastAPI:
             await websocket.close()
             return
         await websocket.send_json({"op": "snapshot", "state": to_jsonable(radio.state)})
+        # Initial port state so the UI can render the banner immediately.
+        await websocket.send_json({"op": "port", "state": radio.port_state})
 
         loop = asyncio.get_event_loop()
 
@@ -153,7 +155,11 @@ def create_app(radio=None, manage_radio_lifecycle: bool = False) -> FastAPI:
             }
             loop.create_task(_send_safe(websocket, payload))
 
+        def _on_port(state: str) -> None:
+            loop.create_task(_send_safe(websocket, {"op": "port", "state": state}))
+
         radio.subscribe(_on_delta)
+        radio.add_port_listener(_on_port)
         try:
             while True:
                 msg = await websocket.receive_json()
@@ -176,6 +182,7 @@ def create_app(radio=None, manage_radio_lifecycle: bool = False) -> FastAPI:
             return
         finally:
             radio.unsubscribe(_on_delta)
+            radio.remove_port_listener(_on_port)
 
     app.mount("/", StaticFiles(directory=str(_WEB_DIR), html=True), name="web")
     return app

@@ -27,6 +27,10 @@ class Radio:
         self._single_shot_lock = asyncio.Lock()
         self._consumer_paused = False
         self._captured_frame: asyncio.Future[bytes] | None = None
+        # Port state broadcasting (Task 33). Listeners get string state
+        # changes: "connected" / "disconnected".
+        self.port_state: str = "disconnected"
+        self._port_listeners: list[Callable[[str], None]] = []
 
     async def _enqueue_read(self, frame: bytes) -> None:
         self._outstanding_reads += 1
@@ -35,8 +39,10 @@ class Radio:
     async def start(self) -> None:
         await self.port.open()
         self._consumer = asyncio.create_task(self._consume_frames())
+        self._set_port_state("connected")
 
     async def stop(self) -> None:
+        self._set_port_state("disconnected")
         if self._consumer is not None:
             self._consumer.cancel()
             try:
@@ -44,6 +50,27 @@ class Radio:
             except asyncio.CancelledError:
                 pass
         await self.port.close()
+
+    # ---------- port state listeners ----------
+
+    def add_port_listener(self, cb: Callable[[str], None]) -> None:
+        self._port_listeners.append(cb)
+
+    def remove_port_listener(self, cb: Callable[[str], None]) -> None:
+        try:
+            self._port_listeners.remove(cb)
+        except ValueError:
+            pass
+
+    def _set_port_state(self, state: str) -> None:
+        if state == self.port_state:
+            return
+        self.port_state = state
+        for cb in list(self._port_listeners):
+            try:
+                cb(state)
+            except Exception:
+                pass
 
     def subscribe(self, callback: Callable[[dict], None]) -> None:
         self._subscribers.append(callback)

@@ -9,8 +9,11 @@ from ft710ctl.server import create_app
 def _stub_radio() -> SimpleNamespace:
     return SimpleNamespace(
         state=RadioState(),
+        port_state="disconnected",
         subscribe=lambda cb: None,
         unsubscribe=lambda cb: None,
+        add_port_listener=lambda cb: None,
+        remove_port_listener=lambda cb: None,
     )
 
 
@@ -51,6 +54,8 @@ def test_ws_initial_state():
         assert first["op"] == "snapshot"
         assert "state" in first
         assert "scope" in first["state"]
+        second = ws.receive_json()
+        assert second == {"op": "port", "state": "disconnected"}
 
 
 # ---------- /api/raw ----------
@@ -140,12 +145,19 @@ class _StubRadio:
 
     def __init__(self):
         self.state = RadioState()
+        self.port_state = "disconnected"
         self.calls: list[tuple[str, tuple, dict]] = []
 
     def subscribe(self, callback) -> None:
         pass
 
     def unsubscribe(self, callback) -> None:
+        pass
+
+    def add_port_listener(self, callback) -> None:
+        pass
+
+    def remove_port_listener(self, callback) -> None:
         pass
 
     def __getattr__(self, name):
@@ -162,6 +174,7 @@ def test_ws_set_dispatches_to_radio():
     client = TestClient(app)
     with client.websocket_connect("/ws") as ws:
         ws.receive_json()  # snapshot
+        ws.receive_json()  # port state
         ws.send_json({"op": "set", "field": "scope.span_khz", "value": 100, "request_id": "r1"})
         ack = ws.receive_json()
     assert ack == {"op": "ack", "request_id": "r1"}
@@ -176,6 +189,7 @@ def test_ws_set_enum_field_coerces_string_to_enum():
     client = TestClient(app)
     with client.websocket_connect("/ws") as ws:
         ws.receive_json()  # snapshot
+        ws.receive_json()  # port state
         ws.send_json({
             "op": "set", "field": "scope.mode",
             "value": "WF_CENTER_NORMAL", "request_id": "r2",
@@ -190,7 +204,8 @@ def test_ws_set_unknown_field_returns_error():
     app = create_app(radio=radio)
     client = TestClient(app)
     with client.websocket_connect("/ws") as ws:
-        ws.receive_json()
+        ws.receive_json()  # snapshot
+        ws.receive_json()  # port state
         ws.send_json({"op": "set", "field": "scope.bogus", "value": 1, "request_id": "rx"})
         msg = ws.receive_json()
     assert msg["op"] == "error"
@@ -203,7 +218,8 @@ def test_ws_set_swap_vfo_ignores_value():
     app = create_app(radio=radio)
     client = TestClient(app)
     with client.websocket_connect("/ws") as ws:
-        ws.receive_json()
+        ws.receive_json()  # snapshot
+        ws.receive_json()  # port state
         ws.send_json({"op": "set", "field": "tuning.swap_vfo", "request_id": "rs"})
         ack = ws.receive_json()
     assert ack == {"op": "ack", "request_id": "rs"}
@@ -231,6 +247,7 @@ def test_ws_broadcasts_delta_after_set():
     with TestClient(app) as client:
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()  # snapshot
+            ws.receive_json()  # port state
             ws.send_json({
                 "op": "set", "field": "scope.span_khz",
                 "value": 100, "request_id": "r1",
@@ -249,8 +266,8 @@ def test_ws_broadcasts_to_multiple_clients():
     app = create_app(radio=radio, manage_radio_lifecycle=True)
     with TestClient(app) as client:
         with client.websocket_connect("/ws") as ws1, client.websocket_connect("/ws") as ws2:
-            ws1.receive_json()  # snapshot
-            ws2.receive_json()  # snapshot
+            ws1.receive_json(); ws1.receive_json()  # snapshot + port
+            ws2.receive_json(); ws2.receive_json()  # snapshot + port
             ws1.send_json({
                 "op": "set", "field": "scope.span_khz",
                 "value": 100, "request_id": "r1",
@@ -268,6 +285,35 @@ def test_ws_disconnect_unsubscribes():
     app = create_app(radio=radio, manage_radio_lifecycle=True)
     with TestClient(app) as client:
         with client.websocket_connect("/ws") as ws:
-            ws.receive_json()
-        # After disconnect, subscriber list should be empty.
+            ws.receive_json()  # snapshot
+            ws.receive_json()  # port state
+        # After disconnect, subscriber + port listener lists should be empty.
         assert radio._subscribers == []
+        assert radio._port_listeners == []
+
+
+# ---------- WebSocket port state broadcast ----------
+
+
+def test_ws_sends_current_port_state_on_connect():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    app = create_app(radio=radio, manage_radio_lifecycle=True)
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as ws:
+            ws.receive_json()  # snapshot
+            port_msg = ws.receive_json()
+    assert port_msg == {"op": "port", "state": "connected"}
+
+
+def test_ws_broadcasts_port_disconnected_on_state_change():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    app = create_app(radio=radio, manage_radio_lifecycle=True)
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as ws:
+            ws.receive_json()  # snapshot
+            assert ws.receive_json() == {"op": "port", "state": "connected"}
+            # Simulate the port going down (Task 41 will plug in the real trigger).
+            radio._set_port_state("disconnected")
+            assert ws.receive_json() == {"op": "port", "state": "disconnected"}
