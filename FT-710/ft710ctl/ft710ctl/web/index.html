@@ -111,7 +111,79 @@
 
     <section class="panel" id="tuning-panel">
       <h2>Tuning</h2>
-      <div class="panel__placeholder">populated in Task 37</div>
+
+      <div class="field">
+        <label for="tuning-vfo-a">VFO A (MHz)</label>
+        <input
+          type="number" id="tuning-vfo-a"
+          min="0.030" max="75.000" step="0.000010"
+          data-field="tuning.vfo_a_hz" data-coerce="mhz"
+        />
+      </div>
+
+      <div class="field">
+        <label for="tuning-vfo-b">VFO B (MHz)</label>
+        <input
+          type="number" id="tuning-vfo-b"
+          min="0.030" max="75.000" step="0.000010"
+          data-field="tuning.vfo_b_hz" data-coerce="mhz"
+        />
+      </div>
+
+      <div class="field">
+        <label for="tuning-mode">Mode</label>
+        <select id="tuning-mode" data-field="tuning.mode">
+          <option value="LSB">LSB</option>
+          <option value="USB">USB</option>
+          <option value="CW_U">CW-U</option>
+          <option value="CW_L">CW-L</option>
+          <option value="FM">FM</option>
+          <option value="FM_N">FM-N</option>
+          <option value="AM">AM</option>
+          <option value="AM_N">AM-N</option>
+          <option value="RTTY_L">RTTY-L</option>
+          <option value="RTTY_U">RTTY-U</option>
+          <option value="DATA_L">DATA-L</option>
+          <option value="DATA_U">DATA-U</option>
+          <option value="DATA_FM">DATA-FM</option>
+          <option value="DATA_FM_N">DATA-FM-N</option>
+          <option value="PSK">PSK</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="tuning-band">Band</label>
+        <select id="tuning-band" data-field="tuning.band" data-set-only="true">
+          <option value="" disabled selected>—</option>
+          <option value="M160">160 m</option>
+          <option value="M80">80 m</option>
+          <option value="M60">60 m</option>
+          <option value="M40">40 m</option>
+          <option value="M30">30 m</option>
+          <option value="M20">20 m</option>
+          <option value="M17">17 m</option>
+          <option value="M15">15 m</option>
+          <option value="M12">12 m</option>
+          <option value="M10">10 m</option>
+          <option value="M6">6 m</option>
+          <option value="GEN">General</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>VFOs</label>
+        <button class="action" id="tuning-swap" data-action="tuning.swap_vfo">Swap A ↔ B</button>
+      </div>
+
+      <div class="field">
+        <label for="tuning-split">Split</label>
+        <input type="checkbox" id="tuning-split" data-field="tuning.split" />
+      </div>
+
+      <div class="field">
+        <label for="tuning-clar">CLAR (RX)</label>
+        <input type="checkbox" id="tuning-clar" data-field="tuning.clar_rx_enabled" />
+      </div>
     </section>
 
     <section class="panel" id="rx-panel">

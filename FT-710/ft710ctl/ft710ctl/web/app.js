@@ -180,6 +180,11 @@ function getFieldValue(field) {
 
 function coerceFromInput(el) {
   if (el.type === "checkbox") return el.checked;
+  // MHz → Hz on the way out for frequency inputs.
+  if (el.dataset.coerce === "mhz") {
+    const mhz = Number(el.value);
+    return Number.isFinite(mhz) ? Math.round(mhz * 1_000_000) : el.value;
+  }
   if (el.type === "number" || el.type === "range") {
     const n = Number(el.value);
     return Number.isFinite(n) ? n : el.value;
@@ -200,7 +205,10 @@ function pushIntoElement(el, value) {
     return;
   }
   if (document.activeElement === el) {
-    // Don't clobber while the user is interacting.
+    return;  // don't clobber while the user is interacting
+  }
+  if (el.dataset.coerce === "mhz") {
+    el.value = (Number(value) / 1_000_000).toFixed(6);
     return;
   }
   el.value = String(value);
@@ -209,7 +217,8 @@ function pushIntoElement(el, value) {
 function bindDataFieldElements() {
   document.querySelectorAll("[data-field]").forEach((el) => {
     const field = el.dataset.field;
-    const eventName = (el.tagName === "SELECT" || el.type === "checkbox") ? "change" : "input";
+    const eventName =
+      el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input";
     el.addEventListener(eventName, () => {
       const value = coerceFromInput(el);
       sendSet(field, value).catch((err) => {
@@ -217,10 +226,23 @@ function bindDataFieldElements() {
       });
     });
   });
+
+  // Action buttons send a fire-and-forget set with no value (e.g. swap_vfo).
+  document.querySelectorAll("[data-action]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const field = btn.dataset.action;
+      sendSet(field, undefined).catch((err) => {
+        console.warn(`action ${field} failed:`, err.message);
+      });
+    });
+  });
 }
 
 function renderDataFieldElements() {
   document.querySelectorAll("[data-field]").forEach((el) => {
+    // Some fields are write-only from the UI's perspective (band has no Read);
+    // skip echoing state into them entirely.
+    if (el.dataset.setOnly === "true") return;
     const value = getFieldValue(el.dataset.field);
     pushIntoElement(el, value);
   });
