@@ -191,6 +191,11 @@ class ScopeSpeed(Enum):
     STOP = "5"
 
 
+@dataclass(frozen=True)
+class ScopeSpeedUpdate:
+    speed: "ScopeSpeed"
+
+
 class ScopePeak(Enum):
     LV1 = "0"
     LV2 = "1"
@@ -276,6 +281,7 @@ RadioUpdate = Union[
     "RfGainUpdate",
     "SplitUpdate",
     "ClarUpdate",
+    "ScopeSpeedUpdate",
     "UnknownFrame",
 ]
 
@@ -610,6 +616,14 @@ def _parse_ref_level(frame: bytes) -> "ScopeRefLevelUpdate | None":
 
 
 def decode(frame: bytes) -> RadioUpdate:
+    if len(frame) == 10 and frame[:2] == b"SS" and frame[-1:] == b";" and frame[5:9] == b"0000":
+        sub = frame[2:4]
+        digit = chr(frame[4])
+        if sub == b"00":
+            try:
+                return ScopeSpeedUpdate(speed=ScopeSpeed(digit))
+            except ValueError:
+                pass
     if len(frame) == 10 and frame[:4] == b"SS05" and frame[-1:] == b";":
         digit = chr(frame[4])
         if digit in _SPAN_KHZ_BY_DIGIT and frame[5:9] == b"0000":

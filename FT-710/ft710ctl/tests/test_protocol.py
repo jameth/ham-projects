@@ -418,6 +418,13 @@ def test_encode_set_scope_speed(name, digit):
     assert protocol.encode_set_scope_speed(speed) == f"SS00{digit}0000;".encode("ascii")
 
 
+@pytest.mark.parametrize("name,digit", SCOPE_SPEED_CASES)
+def test_decode_scope_speed(name, digit):
+    speed = protocol.ScopeSpeed[name]
+    frame = f"SS00{digit}0000;".encode("ascii")
+    assert protocol.decode(frame) == protocol.ScopeSpeedUpdate(speed=speed)
+
+
 SCOPE_PEAK_CASES = [
     ("LV1", "0"), ("LV2", "1"), ("LV3", "2"), ("LV4", "3"), ("LV5", "4"),
 ]
@@ -591,3 +598,5 @@ def test_decode_unknown_two_letter_prefix():
 def test_decode_known_prefix_wrong_length():
     # FA needs exactly 12 bytes
     assert protocol.decode(b"FA12345;") == protocol.UnknownFrame(raw=b"FA12345;")
+    # SS00 Answer needs 10 bytes; this 9-byte frame must fall through
+    assert protocol.decode(b"SS00000;") == protocol.UnknownFrame(raw=b"SS00000;")
