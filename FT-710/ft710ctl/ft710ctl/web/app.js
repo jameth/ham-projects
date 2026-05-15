@@ -163,11 +163,88 @@ function sendSet(field, value) {
   });
 }
 
+// ---- Field binding helpers ----------------------------------------------
+//
+// Each data-field element binds bidirectionally:
+//   * State patches push into the DOM via render().
+//   * User input fires sendSet(field, coerced_value).
+
+function getFieldValue(field) {
+  let cur = state;
+  for (const part of field.split(".")) {
+    if (cur === null || cur === undefined || typeof cur !== "object") return undefined;
+    cur = cur[part];
+  }
+  return cur;
+}
+
+function coerceFromInput(el) {
+  if (el.type === "checkbox") return el.checked;
+  if (el.type === "number" || el.type === "range") {
+    const n = Number(el.value);
+    return Number.isFinite(n) ? n : el.value;
+  }
+  // <select> with numeric option values: keep numeric.
+  if (el.tagName === "SELECT") {
+    const v = el.value;
+    const n = Number(v);
+    return /^[+-]?\d+(\.\d+)?$/.test(v) && Number.isFinite(n) ? n : v;
+  }
+  return el.value;
+}
+
+function pushIntoElement(el, value) {
+  if (value === null || value === undefined) return;
+  if (el.type === "checkbox") {
+    el.checked = Boolean(value);
+    return;
+  }
+  if (document.activeElement === el) {
+    // Don't clobber while the user is interacting.
+    return;
+  }
+  el.value = String(value);
+}
+
+function bindDataFieldElements() {
+  document.querySelectorAll("[data-field]").forEach((el) => {
+    const field = el.dataset.field;
+    const eventName = (el.tagName === "SELECT" || el.type === "checkbox") ? "change" : "input";
+    el.addEventListener(eventName, () => {
+      const value = coerceFromInput(el);
+      sendSet(field, value).catch((err) => {
+        console.warn(`set ${field}=${value} failed:`, err.message);
+      });
+    });
+  });
+}
+
+function renderDataFieldElements() {
+  document.querySelectorAll("[data-field]").forEach((el) => {
+    const value = getFieldValue(el.dataset.field);
+    pushIntoElement(el, value);
+  });
+}
+
+// Scope: keep the ref-level display label in sync with the slider.
+function renderScopeRefDisplay() {
+  const slider = document.getElementById("scope-ref");
+  const display = document.getElementById("scope-ref-display");
+  if (slider && display) {
+    const v = Number(slider.value);
+    display.textContent = `${v >= 0 ? "+" : ""}${v.toFixed(1)} dB`;
+  }
+}
+
+registerRenderer(renderDataFieldElements);
+registerRenderer(renderScopeRefDisplay);
+
 // ---- Boot ----------------------------------------------------------------
 
 window.addEventListener("DOMContentLoaded", () => {
+  bindDataFieldElements();
   connect();
 });
 
-// Expose hooks for panel modules (Task 36 onwards).
+// Expose hooks for panel modules (Task 37+).
 window.ft710 = { state, registerRenderer, sendSet };

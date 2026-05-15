@@ -18,7 +18,95 @@
   <main>
     <section class="panel" id="scope-panel">
       <h2>Scope</h2>
-      <div class="panel__placeholder">populated in Task 36</div>
+
+      <div class="field">
+        <label for="scope-span">Span</label>
+        <select id="scope-span" data-field="scope.span_khz">
+          <option value="1">1 kHz</option>
+          <option value="2">2 kHz</option>
+          <option value="5">5 kHz</option>
+          <option value="10">10 kHz</option>
+          <option value="20">20 kHz</option>
+          <option value="50">50 kHz</option>
+          <option value="100">100 kHz</option>
+          <option value="200">200 kHz</option>
+          <option value="500">500 kHz</option>
+          <option value="1000">1 MHz</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="scope-ref">Ref level</label>
+        <div>
+          <input
+            type="range" id="scope-ref"
+            min="-30" max="30" step="0.5" value="0"
+            data-field="scope.ref_level_db"
+          />
+          <span id="scope-ref-display">0.0 dB</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="scope-mode">Mode</label>
+        <select id="scope-mode" data-field="scope.mode">
+          <option value="DSS_CENTER">3DSS Center</option>
+          <option value="DSS_CURSOR">3DSS Cursor</option>
+          <option value="DSS_FIX">3DSS Fix</option>
+          <option value="WF_CENTER_EXPAND">W/F Center (Expand)</option>
+          <option value="WF_CENTER_NORMAL">W/F Center (Normal)</option>
+          <option value="WF_CURSOR_EXPAND">W/F Cursor (Expand)</option>
+          <option value="WF_CURSOR_NORMAL">W/F Cursor (Normal)</option>
+          <option value="WF_FIX_EXPAND">W/F Fix (Expand)</option>
+          <option value="WF_FIX_NORMAL">W/F Fix (Normal)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="scope-speed">Speed</label>
+        <select id="scope-speed" data-field="scope.speed">
+          <option value="SLOW1">Slow 1</option>
+          <option value="SLOW2">Slow 2</option>
+          <option value="FAST1">Fast 1</option>
+          <option value="FAST2">Fast 2</option>
+          <option value="FAST3">Fast 3</option>
+          <option value="STOP">Stop</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="scope-color">Color</label>
+        <select id="scope-color" data-field="scope.color">
+          <option value="1">Color 1</option>
+          <option value="2">Color 2</option>
+          <option value="3">Color 3</option>
+          <option value="4">Color 4</option>
+          <option value="5">Color 5</option>
+          <option value="6">Color 6</option>
+          <option value="7">Color 7</option>
+          <option value="8">Color 8</option>
+          <option value="9">Color 9</option>
+          <option value="10">Color 10</option>
+          <option value="11">Color 11</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="scope-marker">Marker</label>
+        <input type="checkbox" id="scope-marker" data-field="scope.marker" />
+      </div>
+
+      <div class="field">
+        <label for="scope-af-fft">AF-FFT</label>
+        <select id="scope-af-fft" data-field="scope.af_fft.mode">
+          <option value="AF_FFT_0DB">AF-FFT 0 dB</option>
+          <option value="AF_FFT_10DB">AF-FFT 10 dB</option>
+          <option value="AF_FFT_20DB">AF-FFT 20 dB</option>
+          <option value="OSC_0DB">Oscilloscope 0 dB</option>
+          <option value="OSC_10DB">Oscilloscope 10 dB</option>
+          <option value="OSC_20DB">Oscilloscope 20 dB</option>
+        </select>
+      </div>
     </section>
 
     <section class="panel" id="tuning-panel">
