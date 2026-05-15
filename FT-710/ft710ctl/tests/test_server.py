@@ -126,3 +126,75 @@ async def test_api_raw_timeout_returns_408():
         r = await ac.post("/api/raw", json={"frame": "SS05;", "timeout_s": 0.1})
     await radio.stop()
     assert r.status_code == 408
+
+
+# ---------- WebSocket set dispatch ----------
+
+
+class _StubRadio:
+    """Records every set_* / swap_vfo call; provides RadioState for snapshot."""
+
+    def __init__(self):
+        self.state = RadioState()
+        self.calls: list[tuple[str, tuple, dict]] = []
+
+    def __getattr__(self, name):
+        if name.startswith("set_") or name == "swap_vfo":
+            async def _record(*args, **kwargs):
+                self.calls.append((name, args, kwargs))
+            return _record
+        raise AttributeError(name)
+
+
+def test_ws_set_dispatches_to_radio():
+    radio = _StubRadio()
+    app = create_app(radio=radio)
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws:
+        ws.receive_json()  # snapshot
+        ws.send_json({"op": "set", "field": "scope.span_khz", "value": 100, "request_id": "r1"})
+        ack = ws.receive_json()
+    assert ack == {"op": "ack", "request_id": "r1"}
+    assert radio.calls == [("set_span_khz", (100,), {})]
+
+
+def test_ws_set_enum_field_coerces_string_to_enum():
+    from ft710ctl.radio import protocol
+
+    radio = _StubRadio()
+    app = create_app(radio=radio)
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws:
+        ws.receive_json()  # snapshot
+        ws.send_json({
+            "op": "set", "field": "scope.mode",
+            "value": "WF_CENTER_NORMAL", "request_id": "r2",
+        })
+        ack = ws.receive_json()
+    assert ack == {"op": "ack", "request_id": "r2"}
+    assert radio.calls == [("set_scope_mode", (protocol.ScopeMode.WF_CENTER_NORMAL,), {})]
+
+
+def test_ws_set_unknown_field_returns_error():
+    radio = _StubRadio()
+    app = create_app(radio=radio)
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws:
+        ws.receive_json()
+        ws.send_json({"op": "set", "field": "scope.bogus", "value": 1, "request_id": "rx"})
+        msg = ws.receive_json()
+    assert msg["op"] == "error"
+    assert msg["request_id"] == "rx"
+    assert radio.calls == []
+
+
+def test_ws_set_swap_vfo_ignores_value():
+    radio = _StubRadio()
+    app = create_app(radio=radio)
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws:
+        ws.receive_json()
+        ws.send_json({"op": "set", "field": "tuning.swap_vfo", "request_id": "rs"})
+        ack = ws.receive_json()
+    assert ack == {"op": "ack", "request_id": "rs"}
+    assert radio.calls == [("swap_vfo", (), {})]

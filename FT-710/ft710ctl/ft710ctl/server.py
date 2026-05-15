@@ -12,12 +12,74 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .radio import protocol
 from .radio.state import to_jsonable
 
 
 class RawRequest(BaseModel):
     frame: str
     timeout_s: float = Field(default=1.0, ge=0.05, le=10.0)
+
+
+# Whitelisted (field path → (Radio method name, enum class or None)).
+# enum class is used to coerce a string `.name` from the WebSocket payload
+# back to the actual enum member before calling the verb.
+_SET_DISPATCH: dict[str, tuple[str, type | None]] = {
+    # Scope
+    "scope.span_khz": ("set_span_khz", None),
+    "scope.ref_level_db": ("set_ref_level_db", None),
+    "scope.mode": ("set_scope_mode", protocol.ScopeMode),
+    "scope.speed": ("set_scope_speed", protocol.ScopeSpeed),
+    "scope.peak": ("set_scope_peak", protocol.ScopePeak),
+    "scope.marker": ("set_scope_marker", None),
+    "scope.color": ("set_scope_color", None),
+    "scope.af_fft.mode": ("set_af_fft_mode", protocol.AfFftMode),
+    # Tuning
+    "tuning.vfo_a_hz": ("set_vfo_a_hz", None),
+    "tuning.vfo_b_hz": ("set_vfo_b_hz", None),
+    "tuning.mode": ("set_mode", protocol.OperatingMode),
+    "tuning.band": ("set_band", protocol.Band),
+    "tuning.swap_vfo": ("swap_vfo", None),  # no value
+    "tuning.split": ("set_split", None),
+    "tuning.clar_rx_enabled": ("set_rx_clar", None),
+    # RX DSP
+    "rx.preamp": ("set_preamp", protocol.Preamp),
+    "rx.attenuator": ("set_attenuator", protocol.Attenuator),
+    "rx.agc": ("set_agc", protocol.AgcSet),
+    "rx.nb_enabled": ("set_nb", None),
+    "rx.nb_level": ("set_nb_level", None),
+    "rx.nr_enabled": ("set_nr", None),
+    "rx.nr_level": ("set_nr_level", None),
+    "rx.manual_notch_enabled": ("set_manual_notch", None),
+    "rx.manual_notch_freq_hz": ("set_manual_notch_freq_hz", None),
+    "rx.auto_notch_enabled": ("set_auto_notch", None),
+    "rx.contour_enabled": ("set_contour", None),
+    "rx.contour_freq_hz": ("set_contour_freq_hz", None),
+    "rx.apf_enabled": ("set_apf", None),
+    "rx.apf_freq_hz": ("set_apf_freq_hz", None),
+    "rx.if_shift_hz": ("set_if_shift_hz", None),
+    "rx.filter_width_index": ("set_filter_width", None),
+    # Meters / gain
+    "meters.af_gain": ("set_af_gain", None),
+    "meters.rf_gain": ("set_rf_gain", None),
+}
+
+
+async def _dispatch_set(radio, field: str, value) -> None:
+    entry = _SET_DISPATCH.get(field)
+    if entry is None:
+        raise ValueError(f"unknown field {field!r}")
+    method_name, enum_cls = entry
+    method = getattr(radio, method_name)
+    if method_name == "swap_vfo":
+        await method()
+        return
+    if enum_cls is not None:
+        try:
+            value = enum_cls[value]
+        except (KeyError, TypeError):
+            raise ValueError(f"invalid enum value {value!r} for {field}")
+    await method(value)
 
 
 _WEB_DIR = Path(__file__).parent / "web"
@@ -64,8 +126,22 @@ def create_app(radio=None) -> FastAPI:
         await websocket.send_json({"op": "snapshot", "state": to_jsonable(radio.state)})
         try:
             while True:
-                # Phase 4 follow-up tasks fill in set / patch / port handling.
-                await websocket.receive_text()
+                msg = await websocket.receive_json()
+                op = msg.get("op")
+                request_id = msg.get("request_id")
+                if op == "set":
+                    try:
+                        await _dispatch_set(radio, msg["field"], msg.get("value"))
+                    except (ValueError, TypeError) as exc:
+                        await websocket.send_json(
+                            {"op": "error", "reason": str(exc), "request_id": request_id}
+                        )
+                        continue
+                    await websocket.send_json({"op": "ack", "request_id": request_id})
+                else:
+                    await websocket.send_json(
+                        {"op": "error", "reason": f"unknown op {op!r}", "request_id": request_id}
+                    )
         except WebSocketDisconnect:
             return
 
