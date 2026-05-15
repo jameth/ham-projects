@@ -42,11 +42,13 @@ USB cable: (model)
 - [ ] VFO A → 14.250 MHz
 - [ ] VFO B → 7.074 MHz
 - [ ] Swap VFOs
-- [ ] SplitUon / off / CW-U / CW-L / FM / AM / DATA-U cycle
+- [ ] Mode cycle: USB / LSB / CW-U / CW-L / FM / AM / DATA-U
+- [ ] Band cycle: 160m → 10m via UI
+- [ ] Split on / off
 - [ ] CLAR on / off
 
 ## RX DSP panel
-❯     - [ ] Preamp IPO → AMP1 → AMP2
+- [ ] Preamp IPO → AMP1 → AMP2
 - [ ] Attenuator OFF → 6 dB → 12 dB → 18 dB
 - [ ] AGC OFF / FAST / MID / SLOW / AUTO (confirm AUTO_FAST/MID/SLOW
       shown back when AUTO is set)
