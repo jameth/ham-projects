@@ -199,6 +199,22 @@ class Radio:
         await self.port.send(frame)
         await self.port.send(protocol.encode_read_filter_width())
 
+    # ---------- AF / RF gain + CLAR ----------
+
+    async def set_af_gain(self, value: int) -> None:
+        frame = protocol.encode_set_af_gain(value)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_af_gain())
+
+    async def set_rf_gain(self, value: int) -> None:
+        frame = protocol.encode_set_rf_gain(value)
+        await self.port.send(frame)
+        await self.port.send(protocol.encode_read_rf_gain())
+
+    async def set_rx_clar(self, enabled: bool) -> None:
+        await self.port.send(protocol.encode_set_rx_clar(enabled))
+        await self.port.send(protocol.encode_read_clar())
+
 
 def _require_enum(value, cls) -> None:
     if not isinstance(value, cls):

@@ -656,3 +656,71 @@ async def test_set_filter_width_invalid_no_writes():
         await radio.set_filter_width(24)
     assert fs.writes == []
     await radio.stop()
+
+
+# ---------- AF / RF gain + CLAR ----------
+
+
+async def test_set_af_gain_round_trip():
+    fs = FakeSerial()
+    fs.on(b"AG0;", b"AG0128;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_af_gain(128)
+    await asyncio.sleep(0.05)
+    assert radio.state.meters.af_gain == 128
+    await radio.stop()
+
+
+async def test_set_af_gain_invalid_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(ValueError):
+        await radio.set_af_gain(256)
+    assert fs.writes == []
+    await radio.stop()
+
+
+async def test_set_rf_gain_round_trip():
+    fs = FakeSerial()
+    fs.on(b"RG0;", b"RG0200;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_rf_gain(200)
+    await asyncio.sleep(0.05)
+    assert radio.state.meters.rf_gain == 200
+    await radio.stop()
+
+
+async def test_set_rf_gain_invalid_no_writes():
+    fs = FakeSerial()
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    with pytest.raises(ValueError):
+        await radio.set_rf_gain(256)
+    assert fs.writes == []
+    await radio.stop()
+
+
+async def test_set_rx_clar_on_round_trip():
+    fs = FakeSerial()
+    fs.on(b"CF000;", b"CF00010000;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_rx_clar(True)
+    await asyncio.sleep(0.05)
+    assert radio.state.tuning.clar_rx_enabled is True
+    assert radio.state.tuning.clar_tx_enabled is False
+    await radio.stop()
+
+
+async def test_set_rx_clar_off_round_trip():
+    fs = FakeSerial()
+    fs.on(b"CF000;", b"CF00000000;")
+    radio = Radio(factory=lambda: fs, write_gap_s=0)
+    await radio.start()
+    await radio.set_rx_clar(False)
+    await asyncio.sleep(0.05)
+    assert radio.state.tuning.clar_rx_enabled is False
+    await radio.stop()
