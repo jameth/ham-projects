@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-Portable EFHW 49:1 Unun + 1:1 CMC Performance Calculator
+Portable EFHW Unun + 1:1 CMC Performance Calculator
 
-Models the integrated 49:1 unun (FT-50-43, transformer) and 1:1 CMC
-(FT-50-31, choke) for the KH1 portable EFHW antenna system.
+Models the integrated EFHW unun (FT-50-43 at 23T/3T = 58.8:1, K6ARK
+recommended) and 1:1 CMC (FT-50-43, 12T bifilar) for the KH1 portable
+EFHW antenna system. The "49:1" community name is a misnomer — the
+actual ratio is 58.8:1 in K6ARK's recommended build. See README.md for
+why and for alternative turn counts (21T/49:1, 24T/64:1, etc.).
 
 Extends the parent project's 49:1 simulator (../../../49-1-unun/simulations/
 unun49_performance.py) with FT-50 geometry and adds CMC analysis.
@@ -127,13 +130,22 @@ def magnetizing_impedance(freqs_mhz, turns, material_data, core, num_cores=1):
 
 
 def unun49_performance(freqs_mhz, total_turns, tap_turns, material_data, core,
-                       num_cores=1, z_source=50.0, z_load=2450.0,
+                       num_cores=1, z_source=50.0, z_load=None,
                        c_comp_pf=0.0, coupling_k=0.95):
     """
-    49:1 unun performance: insertion loss, return loss, SWR.
+    EFHW unun performance: insertion loss, return loss, SWR.
+
+    The transformation ratio is (total_turns / tap_turns)². The default
+    load is the "natural matched" load z_source × ratio, so each design
+    is tested against its own correct load (21T/3T → 2450 Ω, 23T/3T →
+    2939 Ω, 24T/3T → 3200 Ω, etc.). Pass z_load explicitly to test a
+    design against a deliberately mismatched load.
+
     Same model as parent project, generalized for arbitrary core.
     """
     ratio = (total_turns / tap_turns) ** 2
+    if z_load is None:
+        z_load = z_source * ratio  # natural matched load for this design
     rm, xm, _, lm = magnetizing_impedance(freqs_mhz, total_turns,
                                            material_data, core, num_cores)
     omega = 2 * np.pi * freqs_mhz * 1e6
@@ -234,12 +246,20 @@ def main():
     # =========================================================================
     unun_designs = [
         # label, total_turns, tap_turns, mix_data, core, num_cores, c_comp_pf
-        ("Old A: 1× FT-50-43, 14T/2T, 100 pF",          14, 2, MIX43_DATA, FT50,  1, 100),
-        ("Old B: 2× FT-50-43, 14T/2T, 100 pF",          14, 2, MIX43_DATA, FT50,  2, 100),
-        ("K6ARK: 1× FT-82-43, 21T/3T, no cap",          21, 3, MIX43_DATA, FT82,  1,   0),
-        ("K6ARK: 1× FT-82-43, 21T/3T, 100 pF",          21, 3, MIX43_DATA, FT82,  1, 100),
-        ("Alt: 1× FT-82-43, 14T/2T, 100 pF",            14, 2, MIX43_DATA, FT82,  1, 100),
-        ("Reference: 1× FT-240-43, 14T/2T, 100 pF",     14, 2, MIX43_DATA, FT240, 1, 100),
+        # Each design is tested against its natural matched load:
+        # z_load = 50 × (total/tap)². So 21T/3T uses 2450 Ω, 23T/3T
+        # uses 2939 Ω, 24T/3T uses 3200 Ω, etc.
+        ("Old A: 1× FT-50-43, 14T/2T (49:1), 100 pF",   14, 2, MIX43_DATA, FT50,  1, 100),
+        ("Old B: 2× FT-50-43, 14T/2T (49:1), 100 pF",   14, 2, MIX43_DATA, FT50,  2, 100),
+        ("True 49:1: 1× FT-50-43, 21T/3T, 100 pF",      21, 3, MIX43_DATA, FT50,  1, 100),
+        ("K6ARK recommended: 1× FT-50-43, 23T/3T (59:1), 100 pF", 23, 3, MIX43_DATA, FT50, 1, 100),
+        ("K6ARK image-count: 1× FT-50-43, 24T/3T (64:1), 100 pF", 24, 3, MIX43_DATA, FT50, 1, 100),
+        ("All-FT-50 stacked: 2× FT-50-43, 23T/3T, 100 pF", 23, 3, MIX43_DATA, FT50,  2, 100),
+        ("K6ARK: 1× FT-82-43, 21T/3T (49:1), no cap",   21, 3, MIX43_DATA, FT82,  1,   0),
+        ("K6ARK: 1× FT-82-43, 21T/3T (49:1), 100 pF",   21, 3, MIX43_DATA, FT82,  1, 100),
+        ("K6ARK on FT-82: 1× FT-82-43, 23T/3T (59:1), 100 pF", 23, 3, MIX43_DATA, FT82, 1, 100),
+        ("Alt: 1× FT-82-43, 14T/2T (49:1), 100 pF",     14, 2, MIX43_DATA, FT82,  1, 100),
+        ("Reference: 1× FT-240-43, 14T/2T (49:1), 100 pF", 14, 2, MIX43_DATA, FT240, 1, 100),
     ]
 
     for d in unun_designs:
@@ -266,11 +286,14 @@ def main():
     # =========================================================================
     fig1, ax1 = plt.subplots(figsize=(12, 7))
     plot_designs = [
-        ("1× FT-50-43, 14T/2T, 100 pF (old A)",   14, 2, MIX43_DATA, FT50,  1, 100, "#FF9800", ":"),
-        ("2× FT-50-43, 14T/2T, 100 pF (old B)",   14, 2, MIX43_DATA, FT50,  2, 100, "#FF9800", "--"),
-        ("1× FT-82-43, 14T/2T, 100 pF",            14, 2, MIX43_DATA, FT82,  1, 100, "#9C27B0", "--"),
-        ("1× FT-82-43, 21T/3T, 100 pF (K6ARK)",   21, 3, MIX43_DATA, FT82,  1, 100, "#2196F3", "-"),
-        ("Bench ref: 1× FT-240-43, 100 pF",       14, 2, MIX43_DATA, FT240, 1, 100, "#4CAF50", "--"),
+        ("1× FT-50-43, 14T/2T (49:1, old A)",       14, 2, MIX43_DATA, FT50,  1, 100, "#FF9800", ":"),
+        ("1× FT-50-43, 21T/3T (true 49:1)",         21, 3, MIX43_DATA, FT50,  1, 100, "#E91E63", "--"),
+        ("1× FT-50-43, 23T/3T (K6ARK recommended, 59:1)", 23, 3, MIX43_DATA, FT50, 1, 100, "#E91E63", "-"),
+        ("1× FT-50-43, 24T/3T (K6ARK image, 64:1)", 24, 3, MIX43_DATA, FT50,  1, 100, "#E91E63", ":"),
+        ("2× FT-50-43, 23T/3T (all-FT-50)",         23, 3, MIX43_DATA, FT50,  2, 100, "#FF5722", "--"),
+        ("1× FT-82-43, 21T/3T (FT-82 49:1)",        21, 3, MIX43_DATA, FT82,  1, 100, "#2196F3", "--"),
+        ("1× FT-82-43, 23T/3T (FT-82 59:1)",        23, 3, MIX43_DATA, FT82,  1, 100, "#2196F3", "-"),
+        ("Bench ref: 1× FT-240-43, 14T/2T",         14, 2, MIX43_DATA, FT240, 1, 100, "#4CAF50", "--"),
     ]
     for label, total, tap, mat, core, num, c_pf, color, style in plot_designs:
         il, _, _ = unun49_performance(freqs, total, tap, mat, core, num,
@@ -290,9 +313,10 @@ def main():
 
     ax1.set_xlabel("Frequency (MHz)", fontsize=12)
     ax1.set_ylabel("Insertion Loss (dB)", fontsize=12)
-    ax1.set_title("Portable 49:1 Unun — Insertion Loss vs Frequency\n"
-                  "(2450 Ω load on radiator port, KH1 bands shaded)",
-                  fontsize=13)
+    ax1.set_title("Portable EFHW Unun — Insertion Loss vs Frequency\n"
+                  "(each design terminated in its natural matched load:\n"
+                  "21T→2450 Ω, 23T→2940 Ω, 24T→3200 Ω; KH1 bands shaded)",
+                  fontsize=12)
     ax1.legend(fontsize=9, loc="upper right")
     ax1.set_xlim(3, 50)
     ax1.set_ylim(0, 5)
@@ -310,7 +334,7 @@ def main():
     cap_colors = mpl.colormaps["viridis"](np.linspace(0.1, 0.9, len(cap_values)))
 
     for c_pf, color in zip(cap_values, cap_colors):
-        _, _, swr = unun49_performance(freqs, 21, 3, MIX43_DATA, FT82, 1,
+        _, _, swr = unun49_performance(freqs, 23, 3, MIX43_DATA, FT50, 1,
                                         c_comp_pf=c_pf)
         lbl = "no cap" if c_pf == 0 else f"{c_pf} pF"
         lw = 2.5 if c_pf == 100 else 1.6
@@ -327,8 +351,8 @@ def main():
 
     ax2.set_xlabel("Frequency (MHz)", fontsize=12)
     ax2.set_ylabel("SWR at 50 Ω port", fontsize=12)
-    ax2.set_title("K6ARK build (1× FT-82-43, 21T/3T) — SWR vs Compensation Cap\n"
-                  "(ideal 2450 Ω load on radiator port)", fontsize=13)
+    ax2.set_title("Primary build (1× FT-50-43, 23T/3T = 58.8:1) — SWR vs Compensation Cap\n"
+                  "(ideal 2940 Ω matched load on radiator port)", fontsize=12)
     ax2.legend(fontsize=9, title="C_comp", title_fontsize=10)
     ax2.set_xlim(3, 50)
     ax2.set_ylim(1, 4)
@@ -379,15 +403,15 @@ def main():
     # =========================================================================
     fig4, axes = plt.subplots(2, 1, figsize=(12, 9), sharex=True)
 
-    # Top: unun IL for K6ARK build (1× FT-82-43, 21T/3T) with 100 pF
+    # Top: unun IL for primary build (1× FT-50-43, 23T/3T) with 100 pF
     ax_il = axes[0]
-    il, _, swr = unun49_performance(freqs, 21, 3, MIX43_DATA, FT82, 1,
+    il, _, swr = unun49_performance(freqs, 23, 3, MIX43_DATA, FT50, 1,
                                      c_comp_pf=100)
-    ax_il.semilogx(freqs, il, color="#2196F3", linewidth=2.5, label="Unun IL")
+    ax_il.semilogx(freqs, il, color="#E91E63", linewidth=2.5, label="Unun IL")
     ax_il.axhline(y=1.0, color="orange", linestyle="--", alpha=0.4)
     ax_il.set_ylabel("Insertion Loss (dB)", fontsize=11)
-    ax_il.set_title("Recommended Build (1× FT-82-43, 21T/3T, 100 pF) — System Performance",
-                    fontsize=13)
+    ax_il.set_title("Primary Build (1× FT-50-43, 23T/3T = 58.8:1, 100 pF) — System Performance",
+                    fontsize=12)
     ax_il.set_ylim(0, 3)
     ax_il.invert_yaxis()
     ax_il.grid(True, which="both", alpha=0.3)
